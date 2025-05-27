@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package picoscope_5444DMSO;
+
+// Implement your grpc proto file here.
+// Introduction to gRPC: https://grpc.io/docs/what-is-grpc/introduction/
+
+service Config {
+    rpc get_valid_voltage_scales(empty) returns (VoltScaleListResponse);
+}
+
+service StreamAllTraces {
+    rpc stream_traces(empty) returns (stream AllTraces);
+}
+
+message empty {}
+
+message AllTraces {
+    repeated ChannelTrace traces = 1;
+}
+
+message ChannelTrace {
+    int32 channel_idx = 1;
+    int32 sample_interval_ns = 2;
+    float volt_scale_volts = 3;
+    Timestamp timestamp = 4;
+    repeated float trace = 100;
+}
+
+message VoltScaleListResponse {
+    repeated VoltScale scales = 1;
+}
+
+message VoltScale {
+    string ValidScaleName    = 1;
+    float  ValidScaleVoltage = 2;
+}
+
+// From google.protobuf
+message Timestamp {
+  // Represents seconds of UTC time since Unix epoch
+  // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
+  // 9999-12-31T23:59:59Z inclusive.
+  int64 seconds = 1;
+
+  // Non-negative fractions of a second at nanosecond resolution. Negative
+  // second values with fractions must still have non-negative nanos values
+  // that count forward in time. Must be from 0 to 999,999,999
+  // inclusive.
+  int32 nanos = 2;
+}

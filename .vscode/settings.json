@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./picoscope_5444DMSO/src/picoscope_5444DMSO"
+    ]
+}

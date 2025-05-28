@@ -21,10 +21,24 @@ message AllTraces {
 
 message ChannelTrace {
     int32 channel_idx = 1;
-    int32 sample_interval_ns = 2;
-    float volt_scale_volts = 3;
-    Timestamp timestamp = 4;
-    repeated float trace = 100;
+    int32 channel_data_idx = 2; // Set to zero if the only data is the trace.  For some acquisition modes, there may be more than one data stream for channel, e.g. min, max, mean from picoscope
+
+    int32 sample_interval_ns = 21;
+    int32 trigger_holdoff_ns = 22;
+
+    int32 trace_resolution_bits = 31;
+    float volt_scale_volts = 32; // This represents the +/- range of the oscilloscope, so the full range is double the value passed here
+    float volt_offset_volts = 33; // Offset of the center of the voltage range from 0V
+
+    int32 number_captures = 81; // For multiple acquisitions of waveforms, e.g. Picoscope Rapid Block Mode
+    int32 accumulation_method = 82; // 0 for single-shot acquisition.  1: Averaging
+
+    Timestamp timestamp = 91;
+    int32 acquisition_mode = 92;  // TODO: determine a mapping from Picoscope modes to integers
+    int32 osci_coupling = 93; // 0:DC coupling, 1:AC coupling, 2:GND coupling
+
+    int32 trace_length = 100;
+    repeated float trace = 101;
 }
 
 message VoltScaleListResponse {

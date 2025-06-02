@@ -15,6 +15,7 @@ class StyledPlotWidget(QWidget):
 
         # Create the PlotWidget
         self.plot_widget = pg.PlotWidget()
+        self.plot_widget.getPlotItem().setDownsampling(auto=True)
         self._default_pen = pg.mkPen(color=default_color, width=2)
         self._configure(background, grid_alpha)
 
@@ -37,6 +38,7 @@ class StyledPlotWidget(QWidget):
         self.hLine.setVisible(False)
 
         self.plot_widget.scene().sigMouseMoved.connect(self.mouseMoved)
+        # TODO: instead of a mousemoved() signal, just the crosshairs when the rest of the stuff is updated.
 
     def _configure(self, background, grid_alpha):
         # Background

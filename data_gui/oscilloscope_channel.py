@@ -1,6 +1,5 @@
-from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
-                               QSpinBox, QComboBox, QPushButton, QCheckBox, 
-                               QWidget, QDial, QColorDialog)
+from PySide6.QtWidgets import (QComboBox, QPushButton, QCheckBox, 
+                               QDial, QColorDialog)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QWheelEvent
 from base_settings_panel import BaseSettingsPanel # Changed from relative to absolute import
@@ -24,7 +23,7 @@ class SingleClickDial(QDial):
         # Accept the event so no further handling happens
         event.accept()
 
-class OscilloscopeChannelControlPanel(BaseSettingsPanel): # Inherit from BaseSettingsPanel
+class OscilloscopeChannelControlPanel(BaseSettingsPanel):
     """A modular control panel for a single oscilloscope channel (vertical controls)."""
     # Signals to notify when an attribute changes
     colorChanged = Signal(tuple)
@@ -40,14 +39,6 @@ class OscilloscopeChannelControlPanel(BaseSettingsPanel): # Inherit from BaseSet
         # self.name = channel_name # name is handled by BaseSettingsPanel title
         self._color = QColor(*color) # Store as QColor internally
         self.data_receiver = data_receiver
-
-        # self.layout = QVBoxLayout() # Removed: BaseSettingsPanel manages its layout
-        # self.setLayout(self.layout) # Removed
-
-        # self.group = QGroupBox(self.name) # Removed: BaseSettingsPanel is the QGroupBox
-        # self.group.setSizePolicy(self.sizePolicy()) # Removed
-        # self.group_layout = QVBoxLayout() # Removed: Use self.add_setting_row with _form_layout
-        # self.group.setLayout(self.group_layout) # Removed
 
         # Voltage scale selector
         self.voltage_scale_selector = QComboBox()
@@ -73,6 +64,7 @@ class OscilloscopeChannelControlPanel(BaseSettingsPanel): # Inherit from BaseSet
         self.enable_button.stateChanged.connect(self._on_enable_state_changed)
         # self.enable_row.addWidget(self.enable_button) # Removed
         self.add_setting_row("Enable", self.enable_button) # Use add_setting_row
+        self.enable_button.setChecked(True)
 
         # Logging checkbox
         # self.logging_row = QHBoxLayout() # Removed
@@ -91,6 +83,7 @@ class OscilloscopeChannelControlPanel(BaseSettingsPanel): # Inherit from BaseSet
         self.display_button.stateChanged.connect(self._on_display_state_changed)
         # self.display_row.addWidget(self.display_button) # Removed
         self.add_setting_row("Show Trace", self.display_button) # Use add_setting_row
+        self.display_button.setChecked(True)
 
         # Color display button
         self.color_button = QPushButton() 
@@ -100,9 +93,7 @@ class OscilloscopeChannelControlPanel(BaseSettingsPanel): # Inherit from BaseSet
         self._update_color_button_style() 
         self.color_button.clicked.connect(self._show_color_dialog)
         self.add_setting_row("Trace Color", self.color_button) # Use add_setting_row
-
-        # self.layout.addWidget(self.group) # Removed
-        # self.layout.addStretch(1) # Removed
+        self.colorChanged.emit(self._color.getRgb()[:3])
 
     def _update_color_button_style(self):
         """Updates the background color of the color button."""

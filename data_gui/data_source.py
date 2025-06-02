@@ -1,8 +1,8 @@
 # data_source.py
 import logging
+import time
 import numpy as np
 import asyncio
-import PySide6.QtAsyncio as QtAsyncio
 from PySide6.QtCore import Signal, QObject # Added Signal, QObject
 from oscilloscope_channel import OscilloscopeChannelControlPanel
 from PySide6.QtWidgets import QVBoxLayout
@@ -50,25 +50,33 @@ class DataReceiver(QObject): # Inherit from QObject to support signals
         """
         trace_count = 0
         self.logger.info("Starting continuous trace generation for multiple channels...")
-        while True:  # Loop to continuously generate data
-            await asyncio.sleep(0.05)  # Simulate data acquisition delay (50ms for 20Hz per channel effectively)
-            t = np.linspace(0, 1, 5000)  # Reduced points for potentially smoother/faster plotting
-            
+
+        start_time = time.perf_counter()
+        sleep_time_adj = 0.0
+        while True:
+            t = np.linspace(0, 1, 10000)
             for i in range(self.NUM_CHANNELS):
-                # Modify the signal over time to visualize updates
-                phase_shift = trace_count * np.pi / (30 + i*5)  # Introduce a phase shift, slightly different per channel
-                noise = np.random.randn(len(t)) * (0.05 + i*0.02) # Add a little noise, different per channel
-                
+                phase_shift = trace_count * np.pi / (30 + i*5)
+                noise = np.random.randn(len(t)) * (0.05 + i*0.02)
+
                 if i == 0:
                     signal = np.sin(10.0 * np.pi * t + phase_shift) + noise
                 else:
-                    signal = np.cos(12.0 * np.pi * t + phase_shift) + noise # Different base signal for channel 1
-                
+                    signal = np.cos(12.0 * np.pi * t + phase_shift) + noise
+
                 self.logger.debug(f"Yielding trace {trace_count} for channel {i}")
                 yield i, t, signal
+
             trace_count += 1
 
-    def add_oscilloscope_controls(self): # Renamed from add_oscilloscope_control
+            # Calculate how much time to sleep to maintain 20Hz
+            elapsed_time = time.perf_counter() - start_time
+            start_time = time.perf_counter()
+            sleep_time_error = 0.05 - elapsed_time
+            sleep_time_adj += 0.1 * sleep_time_error
+            await asyncio.sleep(max(0, 0.05 + sleep_time_adj))
+
+    def add_oscilloscope_controls(self):
         """Adds OscilloscopeChannelControlPanels for all channels to the given parent panel."""
         for i in range(self.NUM_CHANNELS):
             channel_name = f"Channel {i}"
@@ -91,19 +99,11 @@ class DataReceiver(QObject): # Inherit from QObject to support signals
             control.displayStateChanged.connect(
                 lambda state, idx=i: self.trace_display_changed.emit(idx, state)
             )
-            # TODO: Connect other signals from OscilloscopeChannelControlPanel as needed for each channel
-            # control.voltageScaleChanged.connect(lambda scale, idx=i: self.data_receiver.set_voltage_scale(idx, scale))
-            # control.offsetChanged.connect(lambda offset, idx=i: self.data_receiver.set_offset(idx, offset))
-            # control.enabledStateChanged.connect(lambda enabled, idx=i: self.data_receiver.set_enabled(idx, enabled))
 
             if hasattr(self.control_panel, 'add_panel'):
                 self.control_panel.add_panel(control)
             elif hasattr(self.control_panel, 'layout') and isinstance(self.control_panel.layout(), QVBoxLayout):
                 self.control_panel.layout().addWidget(control)
-            else:
-                # This error should ideally be caught earlier or handled more gracefully
-                self.logger.error("Parent panel for oscilloscope controls is not configured correctly.")
-                raise TypeError("Parent panel must have a QVBoxLayout or add_panel method.")
 
     # Utility methods for channel control panels
     def update_save_data(self, channel_idx, state):

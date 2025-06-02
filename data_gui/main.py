@@ -209,7 +209,7 @@ class MainWindow(QMainWindow):
                 # You can choose other themes from qt_material, e.g., 'dark_blue.xml'
                 qt_material.apply_stylesheet(app, theme='dark_teal.xml')
             else:
-                app.setStyleSheet("") # Revert to default or QStyleFactory style
+                app.setStyleSheet("") # type: ignore # Revert to default or QStyleFactory style
             # Update the status bar or log
             status = "enabled" if checked else "disabled"
             self.statusBar().showMessage(f"Qt-Material (Dark) style {status}.")
@@ -220,6 +220,7 @@ class MainWindow(QMainWindow):
         self.dock_area.restoreState(self.initial_dock_state)
 
     def switch_data_source(self, source_cls):
+        # TODO: add logic to reset control panel.
         """Cancel the old loop, clear plots, re-init receiver, restart."""
         # 1) cancel
         if self._data_task:
@@ -267,17 +268,26 @@ class MainWindow(QMainWindow):
 
 
     async def update_data(self):
+        # TODO: we can keep collecting data separately, but we should setData once per cycle so we're not double-drawing.
         now = time.perf_counter()
         self._last_receive = now
+        self._last_channel = -1
+        self._channel_skips = 0
         try:
             # get_trace now yields (channel_idx, t, signal) for multi-channel sources
             async for data_tuple in self.receiver.get_trace(): 
-                channel_idx, t, signal = data_tuple # Correctly unpack 3 values
+                channel_idx, t, signal = data_tuple
 
                 # measure arrival interval
                 now = time.perf_counter()
-                interval_ms = (now - self._last_receive) * 1e3
-                self._last_receive = now
+                if (self._last_channel == -1) or (self._channel_skips > 10): # Assign new channel to measure intervals
+                    self._last_channel = channel_idx
+                if channel_idx == self._last_channel:
+                    interval_ms = (now - self._last_receive) * 1e3
+                    self._last_receive = now
+                    self._channel_skips = 0
+                else:
+                    self._channel_skips += 1 # If there hasn't been the recurring channel for a while, this counter triggers a reassignment.
 
                 # draw timing
                 t0 = time.perf_counter()
@@ -295,11 +305,12 @@ class MainWindow(QMainWindow):
                 self.trace_plot.refresh_crosshair() # Refresh crosshair after data update
 
                 # process & plot results
-                val = self.processor.process((t, signal))
-                self.results_data.append(val)
-                self.results_line.setData(range(len(self.results_data)),
-                                         self.results_data)
-                self.results_plot.refresh_crosshair() # Refresh crosshair after data update
+                if channel_idx == 0:
+                    val = self.processor.process((t, signal))
+                    self.results_data.append(val)
+                    self.results_line.setData(range(len(self.results_data)),
+                                            self.results_data)
+                    self.results_plot.refresh_crosshair() # Refresh crosshair after data update
 
                 draw_ms = (time.perf_counter() - t0) * 1e3
 
@@ -318,7 +329,7 @@ class MainWindow(QMainWindow):
                 self.receiver.trace_color_changed.connect(self._handle_trace_color_changed)
             if hasattr(self.receiver, 'trace_display_changed'):
                 self.receiver.trace_display_changed.connect(self._handle_trace_display_changed)
-            # Connect other signals as needed
+            
 
     def _handle_trace_color_changed(self, channel_idx: int, color_tuple: tuple):
         """Handles the trace_color_changed signal from the DataReceiver."""

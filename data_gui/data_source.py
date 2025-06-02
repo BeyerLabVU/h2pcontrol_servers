@@ -3,20 +3,37 @@ import logging
 import numpy as np
 import asyncio
 import PySide6.QtAsyncio as QtAsyncio
+from PySide6.QtCore import Signal, QObject # Added Signal, QObject
+from oscilloscope_channel import OscilloscopeChannelControlPanel
+from PySide6.QtWidgets import QVBoxLayout
 
 # This class is a basic parent class for any oscilloscope.
 # All specific implementations, e.g. picoscope, should inherit from this one.
-class DataReceiver():
-    menu_name = "Dummy Source"
+class DataReceiver(QObject): # Inherit from QObject to support signals
+    menu_name = "Dummy Source (2 Channels)" # Updated name
     menu_tooltip = \
         "This is a dummy data source that doubles as the parent class for implementations of \
             interfaces for real oscilloscopes (or other data sources).  It is also intended as \
                 a sort of worst-case scenario, running at 20Hz and sending much more data than a \
                     typical oscilloscope would."
 
-    def __init__(self) -> None:
-        self.logger = logging.getLogger(__name__) # Use a module-specific logger
-        self.logger.info("DataReceiver initialized")
+    # Signals for visual properties of traces, including channel index
+    trace_color_changed = Signal(int, tuple)      # channel_idx, (r, g, b)
+    trace_display_changed = Signal(int, bool)     # channel_idx, is_visible
+    # Add other signals as needed, e.g., for voltage scale, offset affecting display directly
+
+    NUM_CHANNELS = 2 # Define number of channels
+    CHANNEL_COLORS = [(255, 100, 100), (100, 100, 255)] # Default colors for channels
+
+    def __init__(self, control_panel=None) -> None:
+        super().__init__() # Call QObject constructor
+        self.logger = logging.getLogger(__name__) 
+        self.logger.info(f"{self.menu_name} initialized")
+        self.control_panel = control_panel
+        self.oscilloscope_controls = [] # Store multiple control panels
+
+        if self.control_panel is not None:
+            self.add_oscilloscope_controls()  # Changed to plural
 
     # Functions for populating settings
     def valid_vscales_volts(self) -> list[float]:
@@ -27,21 +44,92 @@ class DataReceiver():
 
     async def get_trace(self):
         """
-        Asynchronously generates oscilloscope traces continuously.
+        Asynchronously generates oscilloscope traces continuously for multiple channels.
         Yields:
-            tuple: (time_array, signal_array)
+            tuple: (channel_idx, time_array, signal_array)
         """
         trace_count = 0
-        self.logger.info("Starting continuous trace generation...")
+        self.logger.info("Starting continuous trace generation for multiple channels...")
         while True:  # Loop to continuously generate data
-            await asyncio.sleep(0.04)  # Simulate data acquisition delay; controls update rate: double the update rate for stress testing
-            t = np.linspace(0, 1, 10000)  # Reduced points for potentially smoother/faster plotting
+            await asyncio.sleep(0.05)  # Simulate data acquisition delay (50ms for 20Hz per channel effectively)
+            t = np.linspace(0, 1, 5000)  # Reduced points for potentially smoother/faster plotting
             
-            # Modify the signal over time to visualize updates
-            phase_shift = trace_count * np.pi / 30  # Introduce a phase shift
-            noise = np.random.randn(len(t)) * 0.05 # Add a little noise
-            signal = np.sin(10.0 * np.pi * t + phase_shift) + noise
-            
-            self.logger.debug(f"Yielding trace {trace_count}")
-            yield t, signal
+            for i in range(self.NUM_CHANNELS):
+                # Modify the signal over time to visualize updates
+                phase_shift = trace_count * np.pi / (30 + i*5)  # Introduce a phase shift, slightly different per channel
+                noise = np.random.randn(len(t)) * (0.05 + i*0.02) # Add a little noise, different per channel
+                
+                if i == 0:
+                    signal = np.sin(10.0 * np.pi * t + phase_shift) + noise
+                else:
+                    signal = np.cos(12.0 * np.pi * t + phase_shift) + noise # Different base signal for channel 1
+                
+                self.logger.debug(f"Yielding trace {trace_count} for channel {i}")
+                yield i, t, signal
             trace_count += 1
+
+    def add_oscilloscope_controls(self): # Renamed from add_oscilloscope_control
+        """Adds OscilloscopeChannelControlPanels for all channels to the given parent panel."""
+        for i in range(self.NUM_CHANNELS):
+            channel_name = f"Channel {i}"
+            # Ensure CHANNEL_COLORS has enough entries, or use a default/cycling mechanism
+            initial_color = self.CHANNEL_COLORS[i % len(self.CHANNEL_COLORS)] 
+
+            control = OscilloscopeChannelControlPanel(
+                channel_idx=i,
+                channel_name=channel_name,
+                color=initial_color,
+                data_receiver=self
+            )
+            self.oscilloscope_controls.append(control)
+
+            # Connect signals from this specific control panel
+            control.colorChanged.connect(
+                # Use a lambda that captures the correct channel_idx (i) for this control
+                lambda color_tuple, idx=i: self.trace_color_changed.emit(idx, color_tuple)
+            )
+            control.displayStateChanged.connect(
+                lambda state, idx=i: self.trace_display_changed.emit(idx, state)
+            )
+            # TODO: Connect other signals from OscilloscopeChannelControlPanel as needed for each channel
+            # control.voltageScaleChanged.connect(lambda scale, idx=i: self.data_receiver.set_voltage_scale(idx, scale))
+            # control.offsetChanged.connect(lambda offset, idx=i: self.data_receiver.set_offset(idx, offset))
+            # control.enabledStateChanged.connect(lambda enabled, idx=i: self.data_receiver.set_enabled(idx, enabled))
+
+            if hasattr(self.control_panel, 'add_panel'):
+                self.control_panel.add_panel(control)
+            elif hasattr(self.control_panel, 'layout') and isinstance(self.control_panel.layout(), QVBoxLayout):
+                self.control_panel.layout().addWidget(control)
+            else:
+                # This error should ideally be caught earlier or handled more gracefully
+                self.logger.error("Parent panel for oscilloscope controls is not configured correctly.")
+                raise TypeError("Parent panel must have a QVBoxLayout or add_panel method.")
+
+    # Utility methods for channel control panels
+    def update_save_data(self, channel_idx, state):
+        # Placeholder for logic to handle logging state change for a channel
+        pass
+
+    def update_display(self, channel_idx, state):
+        # Placeholder for logic to handle display state change for a channel
+        pass
+
+    def set_voltage_scale(self, channel_idx, scale):
+        # Placeholder for logic to set voltage scale for a channel
+        pass
+
+    def set_offset(self, channel_idx, offset):
+        # Placeholder for logic to set offset for a channel
+        pass
+
+    def set_enabled(self, channel_idx, enabled):
+        # Placeholder for logic to enable/disable a channel
+        pass
+
+    def set_logging(self, channel_idx, logging):
+        # Placeholder for logic to enable/disable logging for a channel
+        pass
+
+    def set_display(self, channel_idx, display):
+        # Placeholder for logic to show/hide trace for a channel
+        pass

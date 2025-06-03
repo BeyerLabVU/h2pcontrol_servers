@@ -13,16 +13,11 @@ dependencies = [
   "betterproto2-compiler==0.4.0",
   "grpcio>=1.71.0",
   "grpclib>=0.4.8",
-  "h2pcontrol>=1.0",
   "numpy>=2.2.6",
   "picosdk>=1.1",
   "ps5444dmso",
   "si-prefix>=1.3.3",
 ]
 
-[[tool.uv.index]]
-name = "laserlab"
-url = "http://laserlab-mini-s.betta-halibut.ts.net:8080"
-
 [tool.uv.sources]
-ps5444dmso = { path = "../../../../H2PLUS~1/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
+ps5444dmso = { path = "C:/Users/dk/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }

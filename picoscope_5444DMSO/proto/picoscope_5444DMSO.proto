@@ -6,14 +6,39 @@ package picoscope_5444DMSO;
 // Introduction to gRPC: https://grpc.io/docs/what-is-grpc/introduction/
 
 service Config {
-    rpc get_valid_voltage_scales(empty) returns (VoltScaleListResponse);
+    rpc get_valid_voltage_scales(empty) returns (VoltScaleList);
+    rpc get_valid_time_scales(empty) returns (TimeScaleList);
+
+    rpc get_valid_trigger_types(empty) returns (TriggerTypeList);
+    rpc get_valid_coupling_types(empty) returns (CouplingTypeList);
+    rpc parse_timebase(TimebaseRequest) returns (TimebaseResponse);
+    rpc get_shortest_timebase(empty) returns (TimebaseResponse);
+
+    rpc configure_channel(ChannelRequest) returns (ChannelResponse);
+    rpc configure_timebase(TimebaseRequest) returns (TimebaseResponse);
 }
 
 service StreamAllTraces {
+    rpc start_loop(empty) returns (ChannelResponse);
+    rpc stop_loop(empty) returns (ChannelResponse);
     rpc stream_traces(empty) returns (stream AllTraces);
 }
 
 message empty {}
+
+message ChannelRequest {
+    int32 channel_idx = 1; // 0 for channel A, 1 for channel B, etc.
+    bool activate = 2; // true to activate the channel, false to deactivate
+    int32 trace_resolution_bits = 3; // Resolution of the trace in bits
+    int32 channel_coupling = 4; // 0:DC coupling, 1:AC coupling
+    VoltScale channel_voltage_scale = 5; // Voltage scale for the channel, e.g. 1V, 2V, etc.
+    float analog_offset_volts = 6; // Offset of the center of the voltage range from 0V
+}
+
+message ChannelResponse {
+    bool success = 1; // True if the channel was successfully activated or deactivated
+    string message = 2; // Additional information or error message
+}
 
 message AllTraces {
     repeated ChannelTrace traces = 1;
@@ -35,19 +60,64 @@ message ChannelTrace {
 
     Timestamp timestamp = 91;
     int32 acquisition_mode = 92;  // TODO: determine a mapping from Picoscope modes to integers
-    int32 osci_coupling = 93; // 0:DC coupling, 1:AC coupling, 2:GND coupling
+    int32 osci_coupling = 93; // 0:DC coupling, 1:AC coupling
 
     int32 trace_length = 100;
     repeated float trace = 101;
 }
 
-message VoltScaleListResponse {
+message TimebaseRequest {
+    int32 timebase_idx = 1; // Index of the timebase to use
+}
+
+message TimebaseResponse {
+    int32 timebase_idx = 1; // Index of the timebase used
+    int32 sample_interval_ns = 2; // Resultant sample interval in nanoseconds
+    string description = 3; // Error message if any, empty if successful
+    bool success = 4; // True if the timebase was successfully parsed
+}
+
+message CouplingTypeList {
+    repeated CouplingType couplings = 1;
+}
+
+message CouplingType {
+    int32 coupling_idx = 1;
+    string description = 2; // Description of the coupling type
+}
+
+message TriggerConfig {
+    int32 trigger_channel_idx = 1; // 0 for channel A, 1 for channel B, etc.
+    TriggerType trigger_type = 2; // See picoscope_utils.py
+    float trigger_level = 3; // Voltage level for the trigger
+    int32 trigger_holdoff_ns = 4; // Holdoff time in nanoseconds
+}
+
+message TriggerTypeList {
+    repeated TriggerType trigger_types = 1;
+}
+
+message TriggerType {
+    int32 trigger_type_idx = 1; // Index of the trigger type
+    string description = 2; // Description of the trigger type
+}
+
+message VoltScaleList {
     repeated VoltScale scales = 1;
 }
 
 message VoltScale {
     string ValidScaleName    = 1;
     float  ValidScaleVoltage = 2;
+}
+
+message TimeScaleList {
+    repeated TimeScale scales = 1;
+}
+
+message TimeScale {
+    string valid_scale_name    = 1;
+    int32  valid_scale_interval_ns = 2; // Sample interval in nanoseconds
 }
 
 // From google.protobuf

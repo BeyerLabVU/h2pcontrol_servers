@@ -5,7 +5,7 @@ requires-python = ">=3.11, <4.0"
 [[package]]
 name = "betterproto2"
 version = "0.4.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-dateutil" },
     { name = "typing-extensions" },
@@ -23,7 +23,7 @@ grpclib = [
 [[package]]
 name = "betterproto2-compiler"
 version = "0.4.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "betterproto2", extra = ["grpclib"] },
     { name = "jinja2" },
@@ -38,7 +38,7 @@ wheels = [
 [[package]]
 name = "grpcio"
 version = "1.71.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1c/95/aa11fc09a85d91fbc7dd405dcb2a1e0256989d67bf89fa65ae24b3ba105a/grpcio-1.71.0.tar.gz", hash = "sha256:2b85f7820475ad3edec209d3d89a7909ada16caab05d3f2e08a7e8ae3200a55c", size = 12549828, upload-time = "2025-03-10T19:28:49.203Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/63/04/a085f3ad4133426f6da8c1becf0749872a49feb625a407a2e864ded3fb12/grpcio-1.71.0-cp311-cp311-linux_armv7l.whl", hash = "sha256:d6aa986318c36508dc1d5001a3ff169a15b99b9f96ef5e98e13522c506b37eef", size = 5210453, upload-time = "2025-03-10T19:24:33.342Z" },
@@ -76,7 +76,7 @@ wheels = [
 [[package]]
 name = "grpclib"
 version = "0.4.8"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "h2" },
     { name = "multidict" },
@@ -89,7 +89,7 @@ wheels = [
 [[package]]
 name = "h2"
 version = "4.2.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hpack" },
     { name = "hyperframe" },
@@ -100,18 +100,9 @@ wheels = [
 ]
 
 [[package]]
-name = "h2pcontrol"
-version = "1.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
-sdist = { url = "http://laserlab-mini-s.betta-halibut.ts.net:8080/packages/h2pcontrol-1.0.tar.gz", hash = "sha256:897b474aa5bb06e1c0c8f2085b884e32432157ca61755332b854b13559d57e40" }
-wheels = [
-    { url = "http://laserlab-mini-s.betta-halibut.ts.net:8080/packages/h2pcontrol-1.0-py3-none-any.whl", hash = "sha256:ed97c136e959d523a4d8e33382827456afbae691706e14529a06ae6f8c340376" },
-]
-
-[[package]]
 name = "hpack"
 version = "4.1.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/2c/48/71de9ed269fdae9c8057e5a4c0aa7402e8bb16f2c6e90b3aa53327b113f8/hpack-4.1.0.tar.gz", hash = "sha256:ec5eca154f7056aa06f196a557655c5b009b382873ac8d1e66e79e87535f1dca", size = 51276, upload-time = "2025-01-22T21:44:58.347Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/c6/80c95b1b2b94682a72cbdbfb85b81ae2daffa4291fbfa1b1464502ede10d/hpack-4.1.0-py3-none-any.whl", hash = "sha256:157ac792668d995c657d93111f46b4535ed114f0c9c8d672271bbec7eae1b496", size = 34357, upload-time = "2025-01-22T21:44:56.92Z" },
@@ -120,7 +111,7 @@ wheels = [
 [[package]]
 name = "hyperframe"
 version = "6.1.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/02/e7/94f8232d4a74cc99514c13a9f995811485a6903d48e5d952771ef6322e30/hyperframe-6.1.0.tar.gz", hash = "sha256:f630908a00854a7adeabd6382b43923a4c4cd4b821fcb527e6ab9e15382a3b08", size = 26566, upload-time = "2025-01-22T21:41:49.302Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/48/30/47d0bf6072f7252e6521f3447ccfa40b421b6824517f82854703d0f5a98b/hyperframe-6.1.0-py3-none-any.whl", hash = "sha256:b03380493a519fce58ea5af42e4a42317bf9bd425596f7a0835ffce80f1a42e5", size = 13007, upload-time = "2025-01-22T21:41:47.295Z" },
@@ -129,7 +120,7 @@ wheels = [
 [[package]]
 name = "jinja2"
 version = "3.1.6"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markupsafe" },
 ]
@@ -141,7 +132,7 @@ wheels = [
 [[package]]
 name = "markupsafe"
 version = "3.0.2"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b2/97/5d42485e71dfc078108a86d6de8fa46db44a1a9295e89c5d6d4a06e23a62/markupsafe-3.0.2.tar.gz", hash = "sha256:ee55d3edf80167e48ea11a923c7386f4669df67d7994554387f84e7d8b0a2bf0", size = 20537, upload-time = "2024-10-18T15:21:54.129Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6b/28/bbf83e3f76936960b850435576dd5e67034e200469571be53f69174a2dfd/MarkupSafe-3.0.2-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:9025b4018f3a1314059769c7bf15441064b2207cb3f065e6ea1e7359cb46db9d", size = 14353, upload-time = "2024-10-18T15:21:02.187Z" },
@@ -189,7 +180,7 @@ wheels = [
 [[package]]
 name = "multidict"
 version = "6.4.4"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/91/2f/a3470242707058fe856fe59241eee5635d79087100b7042a867368863a27/multidict-6.4.4.tar.gz", hash = "sha256:69ee9e6ba214b5245031b76233dd95408a0fd57fdb019ddcc1ead4790932a8e8", size = 90183, upload-time = "2025-05-19T14:16:37.381Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/19/1b/4c6e638195851524a63972c5773c7737bea7e47b1ba402186a37773acee2/multidict-6.4.4-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:4f5f29794ac0e73d2a06ac03fd18870adc0135a9d384f4a306a951188ed02f95", size = 65515, upload-time = "2025-05-19T14:14:19.767Z" },
@@ -266,7 +257,7 @@ wheels = [
 [[package]]
 name = "numpy"
 version = "2.2.6"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/76/21/7d2a95e4bba9dc13d043ee156a356c0a8f0c6309dff6b21b4d71a073b8a8/numpy-2.2.6.tar.gz", hash = "sha256:e29554e2bef54a90aa5cc07da6ce955accb83f21ab5de01a62c8478897b264fd", size = 20276440, upload-time = "2025-05-17T22:38:04.611Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/a8/4f83e2aa666a9fbf56d6118faaaf5f1974d456b1823fda0a176eff722839/numpy-2.2.6-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:f9f1adb22318e121c5c69a09142811a201ef17ab257a1e66ca3025065b7f53ae", size = 21176963, upload-time = "2025-05-17T21:31:19.36Z" },
@@ -320,7 +311,6 @@ dependencies = [
     { name = "betterproto2-compiler" },
     { name = "grpcio" },
     { name = "grpclib" },
-    { name = "h2pcontrol" },
     { name = "numpy" },
     { name = "picosdk" },
     { name = "ps5444dmso" },
@@ -333,17 +323,16 @@ requires-dist = [
     { name = "betterproto2-compiler", specifier = "==0.4.0" },
     { name = "grpcio", specifier = ">=1.71.0" },
     { name = "grpclib", specifier = ">=0.4.8" },
-    { name = "h2pcontrol", specifier = ">=1.0" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "picosdk", specifier = ">=1.1" },
-    { name = "ps5444dmso", path = "../../../../H2PLUS~1/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" },
+    { name = "ps5444dmso", path = "C:/Users/dk/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" },
     { name = "si-prefix", specifier = ">=1.3.3" },
 ]
 
 [[package]]
 name = "picosdk"
 version = "1.1"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -355,19 +344,18 @@ wheels = [
 [[package]]
 name = "ps5444dmso"
 version = "1.0"
-source = { path = "../../../../H2PLUS~1/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
+source = { path = "C:/Users/dk/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
 dependencies = [
     { name = "betterproto2" },
     { name = "betterproto2-compiler" },
     { name = "grpcio" },
     { name = "grpclib" },
-    { name = "h2pcontrol" },
     { name = "numpy" },
     { name = "picosdk" },
     { name = "si-prefix" },
 ]
 wheels = [
-    { filename = "ps5444dmso-1.0-py3-none-any.whl", hash = "sha256:c079e3539fae25fd23b51b496ffbb68758191fe5381c8c67f7425d3ddffe0667" },
+    { filename = "ps5444dmso-1.0-py3-none-any.whl", hash = "sha256:f4c2ed8a4a6f71db30d6af57816e7d153f438d95b3ac271355579a37df2472c6" },
 ]
 
 [package.metadata]
@@ -376,7 +364,6 @@ requires-dist = [
     { name = "betterproto2-compiler", specifier = "==0.4.0" },
     { name = "grpcio", specifier = ">=1.71.0" },
     { name = "grpclib", specifier = ">=0.4.8" },
-    { name = "h2pcontrol", specifier = ">=1.0" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "picosdk", specifier = ">=1.1" },
     { name = "ps5444dmso" },
@@ -386,7 +373,7 @@ requires-dist = [
 [[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "six" },
 ]
@@ -398,7 +385,7 @@ wheels = [
 [[package]]
 name = "ruff"
 version = "0.9.10"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/20/8e/fafaa6f15c332e73425d9c44ada85360501045d5ab0b81400076aff27cf6/ruff-0.9.10.tar.gz", hash = "sha256:9bacb735d7bada9cfb0f2c227d3658fc443d90a727b47f206fb33f52f3c0eac7", size = 3759776, upload-time = "2025-03-07T15:27:44.363Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/73/b2/af7c2cc9e438cbc19fafeec4f20bfcd72165460fe75b2b6e9a0958c8c62b/ruff-0.9.10-py3-none-linux_armv6l.whl", hash = "sha256:eb4d25532cfd9fe461acc83498361ec2e2252795b4f40b17e80692814329e42d", size = 10049494, upload-time = "2025-03-07T15:26:51.268Z" },
@@ -423,7 +410,7 @@ wheels = [
 [[package]]
 name = "si-prefix"
 version = "1.3.3"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b7/a4/1857f675a120e5b9a1b88534664b6f33b6513f8233cd55e410249441c7a3/si_prefix-1.3.3.tar.gz", hash = "sha256:e0ee62c6aefea83d502509d6bb7047c344c38418816406046cb6588f84f44152", size = 20436, upload-time = "2024-07-05T05:37:24.366Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ae/0b/bb1f24a3b168d311278718134844d28e5bbf9a3786d9eac3550f9ff1f14d/si_prefix-1.3.3-py3-none-any.whl", hash = "sha256:c665c38a43d69eeed3e27ee4b1d301225f202024eb2577df9879fe1f272164c6", size = 6394, upload-time = "2024-07-05T05:37:22.938Z" },
@@ -432,7 +419,7 @@ wheels = [
 [[package]]
 name = "six"
 version = "1.17.0"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
@@ -441,7 +428,7 @@ wheels = [
 [[package]]
 name = "typing-extensions"
 version = "4.13.2"
-source = { registry = "http://laserlab-mini-s.betta-halibut.ts.net:8080/" }
+source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f6/37/23083fcd6e35492953e8d2aaaa68b860eb422b34627b13f2ce3eb6106061/typing_extensions-4.13.2.tar.gz", hash = "sha256:e6c81219bd689f51865d9e372991c540bda33a0379d5573cddb9a3a23f7caaef", size = 106967, upload-time = "2025-04-10T14:19:05.416Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/54/b1ae86c0973cc6f0210b53d508ca3641fb6d0c56823f288d108bc7ab3cc8/typing_extensions-4.13.2-py3-none-any.whl", hash = "sha256:a439e7c04b49fec3e5d3e2beaa21755cadbbdc391694e28ccdd36ca4a1408f8c", size = 45806, upload-time = "2025-04-10T14:19:03.967Z" },

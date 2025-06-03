@@ -5,15 +5,15 @@ import logging
 import signal
 from grpclib.server import Server
 import tomllib
-from picoscope_utils import Config, StreamAllTraces
+from picoscope_utils import PicoscopeUtils
 
 async def main(port_override=None):
     # Replace this list with your actual service implementations
-    server = Server([Config(), StreamAllTraces()])
+    server = Server([PicoscopeUtils])
     
     # We gather the port from the h2pcontrol.server.toml file by default, if we can not get that port we take a default port.
     port = port_override or configuration.get("port", 50052)
-    await server.start("[::]", port)
+    await server.start("127.0.0.1", port)
 
     
     logger.info(f"Server started on 127.0.0.1:{port}")

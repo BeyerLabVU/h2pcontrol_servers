@@ -76,7 +76,14 @@ class _osci_channel():
     def is_active(self):
         return self.active
 
-class Config(ConfigBase):
+class Timebase():
+    def __init__(self):
+        self.timebase_idx = None
+        self.sample_interval_ns = None
+        self.preTriggerSamples = None
+        self.postTriggerSamples = None
+
+class PicoscopeUtils(PicoscopeUtilsBase):
     def __init__(self) -> None:
         self.picoscope_open = False
         self.logger = logging.getLogger(__name__)
@@ -84,10 +91,18 @@ class Config(ConfigBase):
         self.valid_scale_names, self.valid_scales = self.util_generate_valid_voltage_scales()
         self.open_picoscope()
 
+        self.timebase = Timebase()
+
         self._channel_info = []
         for idx in range(NUM_CHANNELS):
             channel = _osci_channel(idx)
             self._channel_info.append(channel)
+
+        self.logger.info("Trace Streamer initialized")
+        # These will be set once stream_traces() starts running:
+        self.queue: asyncio.Queue[AllTraces] | None = None
+        self.loop: asyncio.AbstractEventLoop | None = None
+        self.cFuncPtr = None
 
 
     def open_picoscope(self):
@@ -223,6 +238,10 @@ class Config(ConfigBase):
         print("NEW TIMEBASE: sample interval: %.3g ns, max returned samples %d" % (timeIntervalns.value, returnedMaxSamples.value))
         self.time_interval_ns = float(timeIntervalns.value)
         assert_pico_ok(self.status["getTimebase2"])
+        self.timebase.timebase_idx = message.timebase_idx
+        self.timebase.sample_interval_ns = timeIntervalns.value
+        self.timebase.preTriggerSamples = message.n_samples_pre_trigger
+        self.timebase.postTriggerSamples = message.n_samples_post_trigger
         return TimebaseResponse(
             timebase_idx = message.timebase_idx,
             sample_interval_ns = timeIntervalns.value,
@@ -268,15 +287,6 @@ class Config(ConfigBase):
     async def get_valid_trigger_types(self, message: Empty) -> TriggerTypeList:
         return await super().get_valid_trigger_types(message)
 
-class StreamAllTraces(StreamAllTracesBase):
-    def __init__(self) -> None:
-        self.logger = logging.getLogger(__name__)
-        self.logger.info("Trace Streamer initialized")
-        # These will be set once stream_traces() starts running:
-        self.queue: asyncio.Queue[AllTraces] | None = None
-        self.loop: asyncio.AbstractEventLoop | None = None
-        # We'll build the C‐callable block callback once:
-        self.cFuncPtr = None
 
     def timestamp_now(self) -> Timestamp:
         t = datetime.datetime.now().timestamp()
@@ -284,20 +294,23 @@ class StreamAllTraces(StreamAllTracesBase):
         nanos = int((t % 1) * 1e9)
         return Timestamp(seconds, nanos)
 
-    def util_run_block(self, timebase, set_pre_trigger_samples: int, postTriggerSamples: int) -> bool:
+    def util_run_block(self, timebase_idx: int, preTriggerSamples: int, postTriggerSamples: int) -> bool:
         """
         Kick off a single block‐mode capture. We assume:
          - self.cFuncPtr is already set to a ps.BlockReadyType(...) around self.block_ready_callback
          - self.preTriggerSamples, self.n_samples, self.timebase are already configured.
         """
+        if timebase_idx is None:
+            raise Exception('Timebase not initialized!')
+        self.n_samples = preTriggerSamples + postTriggerSamples
         try:
             self.status["runBlock"] = ps.ps5000aRunBlock(
                 self.chandle,
                 ctypes.c_int32(preTriggerSamples),
                 ctypes.c_int32(postTriggerSamples),
-                ctypes.c_int32(timebase),
+                ctypes.c_uint32(timebase_idx),
                 None,
-                ctypes.c_int16(0),
+                ctypes.c_uint32(0),
                 self.cFuncPtr,
                 None
             )
@@ -316,6 +329,7 @@ class StreamAllTraces(StreamAllTracesBase):
           3. Build an AllTraces proto containing one Trace per active channel,
           4. Put it into self.queue via loop.call_soon_threadsafe(...).
         """
+        ts_proto = self.timestamp_now() # First thing, record timestamp of receipt
         if statusCallback != PICO_STATUS['PICO_OK']:
             self.logger.error(f"Block capture failed with status: {statusCallback}")
             # You could choose to signal an error‐message via the queue or raise
@@ -323,7 +337,7 @@ class StreamAllTraces(StreamAllTracesBase):
 
         # 1) For each active channel, set up two buffers (primary + overflow)
         trace_raw_buffers = {}
-        for channel in self.channels:
+        for channel in self._channel_info:
             if channel.is_active():
                 buf1 = (ctypes.c_int16 * self.n_samples)()
                 buf2 = (ctypes.c_int16 * self.n_samples)()
@@ -342,13 +356,14 @@ class StreamAllTraces(StreamAllTracesBase):
         # 2) Pull all values from the scope
         overflow = ctypes.c_int16()
         cmaxSamples = ctypes.c_int32(self.n_samples)
+        # TODO: downsampling support?
         self.status["getValues"] = ps.ps5000aGetValues(
             self.chandle,
-            ctypes.c_int32(0),
+            ctypes.c_uint32(0),
             ctypes.byref(cmaxSamples),
-            ctypes.c_int32(0),
-            ctypes.c_int32(0),
-            ctypes.c_int32(0),
+            ctypes.c_uint32(0),
+            ps.PS5000A_RATIO_MODE['PS5000A_RATIO_MODE_NONE'],
+            ctypes.c_uint32(0),
             ctypes.byref(overflow)
         )
         if self.status["getValues"] == PICO_STATUS["PICO_NOT_RESPONDING"]:
@@ -365,7 +380,7 @@ class StreamAllTraces(StreamAllTracesBase):
         )
         # List of numpy arrays: index 0 is time_axis, then each channel’s voltage array in volts.
         Vch = [time_axis]
-        for channel in self.channels:
+        for channel in self._channel_info:
             if channel.is_active():
                 raw_buf = trace_raw_buffers[channel.channel_idx]
                 # Convert raw ADC to mV, then to V
@@ -377,18 +392,42 @@ class StreamAllTraces(StreamAllTracesBase):
 
         # 4) Build AllTraces proto
         all_traces_msg = AllTraces()
-        ts_proto = self.timestamp_now()
 
         idx = 1  # index into Vch: Vch[1] corresponds to first active channel
-        for channel in self.channels:
+        for channel in self._channel_info:
             if channel.is_active():
-                trace_proto = Trace()
+                # message ChannelTrace {
+                #     int32 channel_idx = 1;
+                #     int32 channel_data_idx = 2; // Set to zero if the only data is the trace.  For some acquisition modes, there may be more than one data stream for channel, e.g. min, max, mean from picoscope
+
+                #     int32 sample_interval_ns = 21;
+                #     int32 trigger_holdoff_ns = 22;
+
+                #     int32 trace_resolution_bits = 31;
+                #     float volt_scale_volts = 32; // This represents the +/- range of the oscilloscope, so the full range is double the value passed here
+                #     float volt_offset_volts = 33; // Offset of the center of the voltage range from 0V
+
+                #     int32 number_captures = 81; // For multiple acquisitions of waveforms, e.g. Picoscope Rapid Block Mode
+                #     int32 accumulation_method = 82; // 0 for single-shot acquisition.  1: Averaging
+
+                #     Timestamp timestamp = 91;
+                #     int32 acquisition_mode = 92;  // TODO: determine a mapping from Picoscope modes to integers
+                #     int32 osci_coupling = 93; // 0:DC coupling, 1:AC coupling
+
+                #     int32 trace_length = 100;
+                #     repeated float trace = 101;
+                #     repeated float times = 102;
+                # }
+                # TODO: populate metadata
+                trace_proto = ChannelTrace()
                 trace_proto.channel_idx = channel.channel_idx
-                trace_proto.timestamp.CopyFrom(ts_proto)
+                trace_proto.timestamp = ts_proto
+                trace_proto.sample_interval_ns = self.timebase.sample_interval_ns
                 # sample_interval in seconds (time_interval_ns * 1e-9)
                 trace_proto.sample_interval = float(self.time_interval_ns) * 1.0e-9
                 # We store the waveform as a repeated field of doubles (one per sample)
-                trace_proto.values.extend(Vch[idx].tolist())
+                trace_proto.trace = Vch[idx].tolist()
+                trace_proto.times = time_axis.tolist()
                 idx += 1
                 all_traces_msg.traces.append(trace_proto)
 
@@ -416,7 +455,9 @@ class StreamAllTraces(StreamAllTracesBase):
         try:
             while True:
                 # Kick off one block capture. As soon as it finishes, block_ready_callback will enqueue data.
-                self.util_run_block()
+                self.util_run_block(self.timebase.timebase_idx,
+                                    self.timebase.preTriggerSamples,
+                                    self.timebase.postTriggerSamples)
 
                 # Wait until block_ready_callback pushes into self.queue
                 all_traces_msg: AllTraces = await self.queue.get()
@@ -440,9 +481,9 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     logger.info("TESTING Picoscope 5444DMSO Utils")
 
-    config = Config()
-    logger.info(config.valid_scale_names)
-    logger.info(config.valid_scales)
+    pu = PicoscopeUtils()
+    logger.info(pu.valid_scale_names)
+    logger.info(pu.valid_scales)
 
     # Example usage of configure_channel
     async def run_configure_channel():
@@ -451,10 +492,10 @@ if __name__ == "__main__":
             activate = True,
             trace_resolution_bits = 8,
             channel_coupling = 0,  # 0 for DC, 1 for AC
-            channel_voltage_scale = config.valid_scales[9],
+            channel_voltage_scale = pu.valid_scales[9],
             analog_offset_volts = 0.0,  # No offset
         )
-        response = await config.configure_channel(channel_request)
+        response = await pu.configure_channel(channel_request)
         logger.info(response)
 
     asyncio.run(run_configure_channel())
@@ -467,7 +508,7 @@ if __name__ == "__main__":
             trigger_level_volts = 0.5,  # Trigger level in volts
             trigger_holdoff_ns = 0,
         )
-        response = await config.configure_trigger(trigger_config)
+        response = await pu.configure_trigger(trigger_config)
         logger.info(response)
 
     asyncio.run(run_configure_trigger())
@@ -475,22 +516,20 @@ if __name__ == "__main__":
     # Example usage of configure_timebase
     async def run_configure_timebase():
         timebase_request = TimebaseRequest(
-            timebase_idx = 3,
+            timebase_idx = 300,
             n_samples_pre_trigger = 0,
-            n_samples_post_trigger = 1000,
+            n_samples_post_trigger = 5,
         )
-        response = await config.configure_timebase(timebase_request)
+        response = await pu.configure_timebase(timebase_request)
         logger.info(response)
     asyncio.run(run_configure_timebase())
 
-    # Example usage of stream_traces (block mode)
-    streamer = StreamAllTraces()
-
     async def run_stream():
-        async for traces in streamer.stream_traces(Empty()):
+        async for traces in pu.stream_traces(Empty()):
             logger.info(f"Received block with {len(traces.traces)} channels.")
             for tr in traces.traces:
-                logger.info(f"  Channel {tr.channel_idx}: {len(tr.values)} samples @ {tr.sample_interval}s")
+                logger.info(f"  Channel {tr.channel_idx}: {len(tr.trace)} samples @ {tr.sample_interval}s")
+                logger.info(tr.trace)
 
-    asyncio.run(run_stream())  # Uncomment once you have the timebase & channels set up
+    asyncio.run(run_stream())
 

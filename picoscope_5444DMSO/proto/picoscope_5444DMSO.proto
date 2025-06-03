@@ -5,7 +5,7 @@ package picoscope_5444DMSO;
 // Implement your grpc proto file here.
 // Introduction to gRPC: https://grpc.io/docs/what-is-grpc/introduction/
 
-service Config {
+service PicoscopeUtils {
     rpc get_valid_voltage_scales(empty) returns (VoltScaleList);
     rpc get_valid_time_scales(empty) returns (TimeScaleList);
 
@@ -17,9 +17,7 @@ service Config {
     rpc configure_channel(ChannelRequest) returns (ChannelResponse);
     rpc configure_trigger(TriggerConfig) returns (ChannelResponse);
     rpc configure_timebase(TimebaseRequest) returns (TimebaseResponse);
-}
 
-service StreamAllTraces {
     rpc start_loop(empty) returns (ChannelResponse);
     rpc stop_loop(empty) returns (ChannelResponse);
     rpc stream_traces(empty) returns (stream AllTraces);
@@ -65,6 +63,7 @@ message ChannelTrace {
 
     int32 trace_length = 100;
     repeated float trace = 101;
+    repeated float times = 102;
 }
 
 message TimebaseRequest {

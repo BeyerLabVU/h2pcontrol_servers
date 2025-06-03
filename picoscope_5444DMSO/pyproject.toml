@@ -20,4 +20,5 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-ps5444dmso = { path = "C:/Users/dk/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
+ps5444dmso = { path = "../../../../../tmp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
+

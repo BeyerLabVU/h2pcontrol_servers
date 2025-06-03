@@ -325,7 +325,7 @@ requires-dist = [
     { name = "grpclib", specifier = ">=0.4.8" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "picosdk", specifier = ">=1.1" },
-    { name = "ps5444dmso", path = "C:/Users/dk/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" },
+    { name = "ps5444dmso", path = "../../../../../tmp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" },
     { name = "si-prefix", specifier = ">=1.3.3" },
 ]
 
@@ -344,7 +344,7 @@ wheels = [
 [[package]]
 name = "ps5444dmso"
 version = "1.0"
-source = { path = "C:/Users/dk/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
+source = { path = "../../../../../tmp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
 dependencies = [
     { name = "betterproto2" },
     { name = "betterproto2-compiler" },
@@ -355,7 +355,7 @@ dependencies = [
     { name = "si-prefix" },
 ]
 wheels = [
-    { filename = "ps5444dmso-1.0-py3-none-any.whl", hash = "sha256:f4c2ed8a4a6f71db30d6af57816e7d153f438d95b3ac271355579a37df2472c6" },
+    { filename = "ps5444dmso-1.0-py3-none-any.whl", hash = "sha256:562800a82b76261807cc1a5966c575cb6ac9ad25bcccf19fc26b60e4a065ba8e" },
 ]
 
 [package.metadata]

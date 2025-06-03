@@ -15,6 +15,7 @@ service Config {
     rpc get_shortest_timebase(empty) returns (TimebaseResponse);
 
     rpc configure_channel(ChannelRequest) returns (ChannelResponse);
+    rpc configure_trigger(TriggerConfig) returns (ChannelResponse);
     rpc configure_timebase(TimebaseRequest) returns (TimebaseResponse);
 }
 
@@ -68,6 +69,8 @@ message ChannelTrace {
 
 message TimebaseRequest {
     int32 timebase_idx = 1; // Index of the timebase to use
+    int32 n_samples_post_trigger = 2; // Number of samples to capture after the trigger
+    int32 n_samples_pre_trigger = 3; // Number of samples to capture before the trigger
 }
 
 message TimebaseResponse {
@@ -89,7 +92,7 @@ message CouplingType {
 message TriggerConfig {
     int32 trigger_channel_idx = 1; // 0 for channel A, 1 for channel B, etc.
     TriggerType trigger_type = 2; // See picoscope_utils.py
-    float trigger_level = 3; // Voltage level for the trigger
+    float trigger_level_volts = 3; // Voltage level for the trigger
     int32 trigger_holdoff_ns = 4; // Holdoff time in nanoseconds
 }
 

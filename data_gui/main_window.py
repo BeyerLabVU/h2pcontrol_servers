@@ -1,15 +1,10 @@
-import sys
-import signal
-import time
-
 from PySide6.QtWidgets import (
     QMainWindow,
-    QStatusBar,
     QWidget,
     QApplication,
     QHBoxLayout,
 )
-from PySide6.QtGui import QColor, QAction
+from PySide6.QtGui import QColor
 
 from styled_plot import StyledPlotWidget
 from bottom_status_bar import BottomStatusBar
@@ -89,7 +84,7 @@ class MainWindow(QMainWindow):
             if checked:
                 qt_material.apply_stylesheet(app, theme='dark_teal.xml')
             else:
-                app.setStyleSheet("")  # Revert to default QStyle
+                app.setStyleSheet("")  # type: ignore # Revert to default QStyle 
 
             status_text = "enabled" if checked else "disabled"
             self.plot_status_bar.showMessage(f"Qt-Material (Dark) style {status_text}.")

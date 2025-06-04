@@ -4,8 +4,6 @@ import time
 import numpy as np
 import asyncio
 from PySide6.QtCore import Signal, QObject # Added Signal, QObject
-from oscilloscope_channel import OscilloscopeChannelControlPanel
-from PySide6.QtWidgets import QVBoxLayout
 
 # This class is a basic parent class for any oscilloscope.
 # All specific implementations, e.g. picoscope, should inherit from this one.
@@ -33,7 +31,7 @@ class DataReceiver(QObject): # Inherit from QObject to support signals
         self.oscilloscope_controls = [] # Store multiple control panels
 
         if self.control_panel is not None:
-            self.add_oscilloscope_controls()  # Changed to plural
+            self.add_oscilloscope_controls() 
 
     # Functions for populating settings
     def valid_vscales_volts(self) -> list[float]:
@@ -43,11 +41,6 @@ class DataReceiver(QObject): # Inherit from QObject to support signals
         return [1, 5, 10, 50, 100, 500, 1000]
 
     async def get_trace(self):
-        """
-        Asynchronously generates oscilloscope traces continuously for multiple channels.
-        Yields:
-            tuple: (channel_idx, time_array, signal_array)
-        """
         trace_count = 0
         self.logger.info("Starting continuous trace generation for multiple channels...")
 
@@ -77,33 +70,8 @@ class DataReceiver(QObject): # Inherit from QObject to support signals
             await asyncio.sleep(max(0, 0.05 + sleep_time_adj))
 
     def add_oscilloscope_controls(self):
-        """Adds OscilloscopeChannelControlPanels for all channels to the given parent panel."""
-        for i in range(self.NUM_CHANNELS):
-            channel_name = f"Channel {i}"
-            # Ensure CHANNEL_COLORS has enough entries, or use a default/cycling mechanism
-            initial_color = self.CHANNEL_COLORS[i % len(self.CHANNEL_COLORS)] 
-
-            control = OscilloscopeChannelControlPanel(
-                channel_idx=i,
-                channel_name=channel_name,
-                color=initial_color,
-                data_receiver=self
-            )
-            self.oscilloscope_controls.append(control)
-
-            # Connect signals from this specific control panel
-            control.colorChanged.connect(
-                # Use a lambda that captures the correct channel_idx (i) for this control
-                lambda color_tuple, idx=i: self.trace_color_changed.emit(idx, color_tuple)
-            )
-            control.displayStateChanged.connect(
-                lambda state, idx=i: self.trace_display_changed.emit(idx, state)
-            )
-
-            if hasattr(self.control_panel, 'add_panel'):
-                self.control_panel.add_panel(control)
-            elif hasattr(self.control_panel, 'layout') and isinstance(self.control_panel.layout(), QVBoxLayout):
-                self.control_panel.layout().addWidget(control)
+        # Placeholder
+        pass
 
     # Utility methods for channel control panels
     def update_save_data(self, channel_idx, state):

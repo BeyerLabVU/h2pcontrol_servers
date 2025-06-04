@@ -11,6 +11,13 @@ class BaseSettingsPanel(QGroupBox):
     PANEL_FIXED_WIDTH = 300  # Default fixed width for all panels, adjust as needed
 
     def __init__(self, title: str, parent: QWidget = None):
+        """
+        Initializes the BaseSettingsPanel.
+
+        Args:
+            title (str): The title for the QGroupBox.
+            parent (QWidget, optional): The parent widget. Defaults to None.
+        """
         super().__init__(title, parent)
 
         self.setFixedWidth(self.PANEL_FIXED_WIDTH)
@@ -27,13 +34,39 @@ class BaseSettingsPanel(QGroupBox):
         self.setLayout(self._form_layout)
 
     def add_setting_row(self, label_text: str, control_widget: QWidget) -> None:
+        """
+        Adds a new row with a label and a control widget to the settings panel.
+
+        Args:
+            label_text (str): The text for the label.
+            control_widget (QWidget): The widget for the control.
+        """
         label = QLabel(label_text)
         self._form_layout.addRow(label, control_widget)
 
     def add_separator(self) -> None:
+        """
+        Adds a horizontal separator line to the layout.
+        The separator spans both columns of the form layout.
+        """
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         # Add a bit of vertical margin for the separator for better visual separation
         separator.setStyleSheet("QFrame { margin-top: 5px; margin-bottom: 5px; }")
-        self._form_layout.addRow(separator) 
+        self._form_layout.addRow(separator)  # In QFormLayout, addRow(QWidget) spans both columns
+
+    # Example placeholder methods for subclasses to implement:
+    # def get_settings(self) -> dict:
+    #     """
+    #     Subclasses should implement this method to retrieve all current
+    #     settings from their respective controls as a dictionary.
+    #     """
+    #     raise NotImplementedError("Subclasses must implement get_settings()")
+
+    # def set_settings(self, settings: dict) -> None:
+    #     """
+    #     Subclasses should implement this method to apply settings
+    #     from a dictionary to their respective controls.
+    #     """
+    #     raise NotImplementedError("Subclasses must implement set_settings()")

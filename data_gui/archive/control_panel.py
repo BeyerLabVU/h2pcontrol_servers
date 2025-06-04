@@ -26,6 +26,7 @@ class ControlPanel(QScrollArea):
         # Set the content widget as the widget for the scroll area
         self.setWidget(self._content_widget)
 
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)

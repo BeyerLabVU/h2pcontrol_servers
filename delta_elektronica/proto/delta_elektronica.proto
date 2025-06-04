@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package delta_elektronica;
+
+service DeltaElektronicaService {
+  rpc GetDeviceIDN(DeviceIDNRequest) returns (DeviceIDNResponse);
+  rpc GetVoltage(Empty) returns (DeviceVoltageResponse);
+  rpc SetVoltage(DeviceVoltageRequest) returns (DeviceVoltageResponse);
+}
+
+message Empty {}
+
+message DeviceIDNRequest {
+  string port = 1;
+}
+
+message DeviceIDNResponse {
+  string identification = 1;
+}
+
+message DeviceVoltageRequest {
+  int32 voltage = 1; // in volts
+}
+
+message DeviceVoltageResponse {
+  int32 voltage = 1; // actual voltage applied/read
+  string status = 2; // optional status string like "OK"
+}

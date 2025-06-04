@@ -1,103 +1,138 @@
-# data_source.py
-import logging
+import asyncio
 import time
 import numpy as np
-import asyncio
-from PySide6.QtCore import Signal, QObject # Added Signal, QObject
+import reactivex
+from reactivex import operators as ops
+from reactivex.subject import Subject
+from reactivex.scheduler.eventloop import AsyncIOScheduler
 
-# This class is a basic parent class for any oscilloscope.
-# All specific implementations, e.g. picoscope, should inherit from this one.
-class DataReceiver(QObject): # Inherit from QObject to support signals
-    menu_name = "Dummy Source (2 Channels)" # Updated name
-    menu_tooltip = \
-        "This is a dummy data source that doubles as the parent class for implementations of \
-            interfaces for real oscilloscopes (or other data sources).  It is also intended as \
-                a sort of worst-case scenario, running at 20Hz and sending much more data than a \
-                    typical oscilloscope would."
+class DataSource():
+    '''Base class for data sources.'''
 
-    # Signals for visual properties of traces, including channel index
-    trace_color_changed = Signal(int, tuple)      # channel_idx, (r, g, b)
-    trace_display_changed = Signal(int, bool)     # channel_idx, is_visible
-    # Add other signals as needed, e.g., for voltage scale, offset affecting display directly
+    def __init__(self, name="Dummy Data Source", n_channels=2, loop=None):
+        self.name = name
+        self.n_channels = n_channels
+        self.trace_subject = Subject()
+        self._stop_requested = False
+        self._is_running = False
+        self.loop = loop if loop else asyncio.get_event_loop()
+        self.scheduler = AsyncIOScheduler(loop=self.loop)
+        self._subscription = None
 
-    NUM_CHANNELS = 2 # Define number of channels
-    CHANNEL_COLORS = [(255, 100, 100), (100, 100, 255)] # Default colors for channels
+    async def start(self):
+        if self._is_running:
+            print(f"{self.name} is already running.")
+            return
+        print(f"Starting {self.name}...")
+        self._stop_requested = False
+        self._is_running = True
+        asyncio.create_task(self.gen_traces_signal())
 
-    def __init__(self, control_panel=None) -> None:
-        super().__init__() # Call QObject constructor
-        self.logger = logging.getLogger(__name__) 
-        self.logger.info(f"{self.menu_name} initialized")
-        self.control_panel = control_panel
-        self.oscilloscope_controls = [] # Store multiple control panels
 
-        if self.control_panel is not None:
-            self.add_oscilloscope_controls() 
+    async def stop(self):
+        if not self._is_running:
+            print(f"{self.name} is not running.")
+            return
+        print(f"Stopping {self.name}...")
+        self._stop_requested = True
+        self._is_running = False
 
-    # Functions for populating settings
-    def valid_vscales_volts(self) -> list[float]:
-        return [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0]
-
-    def valid_sample_intervals_ns(self) -> list[float]:
-        return [1, 5, 10, 50, 100, 500, 1000]
-
-    async def get_trace(self):
+    async def gen_traces_signal(self):
+        """
+        Asynchronously generates oscilloscope traces continuously for multiple channels.
+        Yields:
+            tuple: (channel_idx, time_array, signal_array)
+        """
         trace_count = 0
-        self.logger.info("Starting continuous trace generation for multiple channels...")
+        print(f"Starting continuous trace generation for {self.name} with {self.n_channels} channels...")
 
         start_time = time.perf_counter()
         sleep_time_adj = 0.0
-        while True:
-            t = np.linspace(0, 1, 10000)
-            for i in range(self.NUM_CHANNELS):
-                phase_shift = trace_count * np.pi / (30 + i*5)
+        while not self._stop_requested:
+            t = np.linspace(0, 10e-6, 10000) # Example time base
+            for i in range(self.n_channels):
+                # Adjust signal generation based on channel index or source properties
+                phase_shift = trace_count * np.pi / (30 + i*5 + hash(self.name)%10) # Vary per source
                 noise = np.random.randn(len(t)) * (0.05 + i*0.02)
 
-                if i == 0:
-                    signal = np.sin(10.0 * np.pi * t + phase_shift) + noise
+                if i % 2 == 0: # Example: different signals for even/odd channels
+                    signal =  1.0 * np.exp(-t / (3e-6 + i*1e-7)) * np.sin(2 * np.pi * (1e6 + i*0.1e6) * t + phase_shift) + noise
                 else:
-                    signal = np.cos(12.0 * np.pi * t + phase_shift) + noise
-
-                self.logger.debug(f"Yielding trace {trace_count} for channel {i}")
-                yield i, t, signal
+                    signal = -0.5 * np.exp(-t / (3e-6 + i*1e-7)) * np.sin(2 * np.pi * (2e6 + i*0.1e6) * t + phase_shift) - noise
+                
+                if not self._stop_requested: # Check again before emitting
+                    self.trace_subject.on_next({"name": self.name, "channel_idx": i, "time_array": t, "signal_array": signal})
 
             trace_count += 1
+            if self._stop_requested:
+                break
 
-            # Calculate how much time to sleep to maintain 20Hz
-            elapsed_time = time.perf_counter() - start_time
-            start_time = time.perf_counter()
-            sleep_time_error = 0.05 - elapsed_time
-            sleep_time_adj += 0.1 * sleep_time_error
-            await asyncio.sleep(max(0, 0.05 + sleep_time_adj))
+            # Calculate how much time to sleep to maintain approx 20Hz update rate per source
+            current_time = time.perf_counter()
+            elapsed_time = current_time - start_time
+            start_time = current_time # Reset start_time for next iteration's measurement
+            
+            target_interval = 0.05 # 20 Hz
+            sleep_time_error = target_interval - elapsed_time
+            sleep_time_adj += 0.1 * sleep_time_error # Proportional adjustment
+            sleep_time_adj = max(-target_interval*0.5, min(target_interval*0.5, sleep_time_adj)) # Clamp adjustment
 
-    def add_oscilloscope_controls(self):
-        # Placeholder
-        pass
+            actual_sleep_time = max(0, target_interval + sleep_time_adj)
+            
+            try:
+                await asyncio.sleep(actual_sleep_time)
+            except asyncio.CancelledError:
+                print(f"{self.name} generation task cancelled.")
+                break
+        
+        print(f"{self.name} trace generation stopped.")
 
-    # Utility methods for channel control panels
-    def update_save_data(self, channel_idx, state):
-        # Placeholder for logic to handle logging state change for a channel
-        pass
+async def main():
+    # Example of using multiple data sources
+    loop = asyncio.get_event_loop()
+    source1 = DataSource(name="RF Source 1", n_channels=2, loop=loop)
+    source2 = DataSource(name="Sensor Array A", n_channels=4, loop=loop)
 
-    def update_display(self, channel_idx, state):
-        # Placeholder for logic to handle display state change for a channel
-        pass
+    def print_trace_info(trace_data):
+        print(f"Received trace from {trace_data['name']} for channel {trace_data['channel_idx']} with {len(trace_data['time_array'])} points")
 
-    def set_voltage_scale(self, channel_idx, scale):
-        # Placeholder for logic to set voltage scale for a channel
-        pass
+    # Subscribe before starting the signal generator
+    # Each source has its own subject
+    sub1 = source1.trace_subject.pipe(
+        ops.observe_on(source1.scheduler)
+    ).subscribe(
+        on_next=print_trace_info,
+        on_error=lambda e: print(f"Error in source1: {e}"),
+        on_completed=lambda: print("Source1 completed")
+    )
 
-    def set_offset(self, channel_idx, offset):
-        # Placeholder for logic to set offset for a channel
-        pass
+    sub2 = source2.trace_subject.pipe(
+        ops.observe_on(source2.scheduler)
+    ).subscribe(
+        on_next=print_trace_info,
+        on_error=lambda e: print(f"Error in source2: {e}"),
+        on_completed=lambda: print("Source2 completed")
+    )
 
-    def set_enabled(self, channel_idx, enabled):
-        # Placeholder for logic to enable/disable a channel
-        pass
+    await source1.start()
+    await source2.start()
 
-    def set_logging(self, channel_idx, logging):
-        # Placeholder for logic to enable/disable logging for a channel
-        pass
+    try:
+        # Keep the loop running for a bit
+        await asyncio.sleep(10)
+    finally:
+        print("Stopping data sources...")
+        await source1.stop()
+        await source2.stop()
+        sub1.dispose()
+        sub2.dispose()
+        print("Data sources stopped and subscriptions disposed.")
+        # Allow tasks to complete
+        await asyncio.sleep(1)
 
-    def set_display(self, channel_idx, display):
-        # Placeholder for logic to show/hide trace for a channel
-        pass
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Application interrupted. Stopping data source...")

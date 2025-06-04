@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from base_settings_panel import BaseSettingsPanel
+from settings_panels.base_settings_panel import BaseSettingsPanel
 
 class ControlPanel(QScrollArea):
     """
@@ -33,14 +33,36 @@ class ControlPanel(QScrollArea):
         self.setMinimumWidth(BaseSettingsPanel.PANEL_FIXED_WIDTH + 30)  
         self.setMaximumWidth(BaseSettingsPanel.PANEL_FIXED_WIDTH + 30)
 
-    def add_panel(self, panel: QGroupBox): # QGroupBox is parent of BaseSettingsPanel
-        """Adds a settings panel (e.g., a BaseSettingsPanel instance) to the control panel."""
-        self._main_layout.addWidget(panel)
+        self.control_panels = []
 
-    def clear_panels(self):
-        """Removes all panels from the control panel."""
+    def add_panel(self, panel: QGroupBox): # QGroupBox is parent of BaseSettingsPanel
+        # Add the panel to the list
+        self.control_panels.append(panel)
+        # Sort panels by PRIORITY (higher comes first)
+        self.control_panels.sort(key=lambda p: -getattr(p, "PRIORITY", 0))
+        # Remove all widgets from layout
         while self._main_layout.count():
             child_item = self._main_layout.takeAt(0)
             if child_item and child_item.widget():
-                child_item.widget().deleteLater()
+                child_item.widget().setParent(None)
+        # Add widgets back in sorted order
+        for p in self.control_panels:
+            self._main_layout.addWidget(p)
+
+    def clear_panels(self):
+        # Remove only panels with ERASABLE=True
+        remaining_panels = []
+        for panel in self.control_panels:
+            if getattr(panel, "ERASABLE", True):
+                # Remove from layout if present
+                panel.setParent(None)
+                panel.deleteLater()
+            else:
+                remaining_panels.append(panel)
+        self.control_panels = remaining_panels
+        # Remove all widgets from layout and re-add remaining panels
+        while self._main_layout.count():
+            child_item = self._main_layout.takeAt(0)
+        for p in self.control_panels:
+            self._main_layout.addWidget(p)
 

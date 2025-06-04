@@ -29,3 +29,9 @@ class BottomStatusBar(QStatusBar):
         formatted_y = si_format(y, precision=3) + 'V'
         formatted_text = f"t ={formatted_x:>12}, V(t) ={formatted_y:>12}"
         self.right_label.setText(formatted_text)
+
+    def clear_coordinates(self):
+        formatted_x = " ------- s"
+        formatted_y = " ------- V"
+        formatted_text = f"t ={formatted_x:>12}, V(t) ={formatted_y:>12}"
+        self.right_label.setText(formatted_text)

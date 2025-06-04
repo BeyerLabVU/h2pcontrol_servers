@@ -10,8 +10,13 @@ class BaseSettingsPanel(QGroupBox):
     """
     PANEL_FIXED_WIDTH = 300  # Default fixed width for all panels, adjust as needed
 
-    def __init__(self, title: str, parent: QWidget = None):
-        super().__init__(title, parent)
+    # These attributes should be overridden as needed in subclasses:
+    PRIORITY = 0  # Default priority for sorting panels, can be overridden`
+    TITLE = "Settings Panel"  # Default title for the group box, can be overridden`
+    ERASABLE = True  # Default to enabled, can be overridden
+
+    def __init__(self, parent: QWidget = None):
+        super().__init__(parent, title=self.TITLE)
 
         self.setFixedWidth(self.PANEL_FIXED_WIDTH)
 

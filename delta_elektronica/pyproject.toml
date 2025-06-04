@@ -4,18 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "delta_elektronica"
-version = "1.0"
+version = "1.2"
 description = "Project initialized by h2pcontrol cli"
-authors = [{ name = "Your Name", email = "you@example.com" }]
-requires-python = ">=3.11, <4.0"
+authors = [{ name = "Tijn Schuitevoerder", email = "tijn.schuitevoerder@student.uva.nl" }]
+requires-python = ">=3.10, <4.0"
 dependencies = [
   "betterproto2==0.4.0",
   "betterproto2-compiler==0.4.0",
-  "delta300",
+  "delta300>=1.2",
   "grpcio>=1.72.1",
   "grpclib>=0.4.8",
+  "h2pcontrol>=1.19",
   "pyserial>=3.5",
 ]
 
-[tool.uv.sources]
-delta300 = { path = "../../../../H2PLUS~1/AppData/Local/Temp/h2pcontrol-temp/dist/delta300-1.0-py3-none-any.whl" }
+[[tool.uv.index]]
+name = "laserlab"
+url = "http://laserlab-mini-s.betta-halibut.ts.net:8080"
+
+
+

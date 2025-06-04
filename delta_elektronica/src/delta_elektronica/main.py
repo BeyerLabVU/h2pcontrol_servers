@@ -11,17 +11,31 @@ from delta300.delta_elektronica import (
     DeviceIdnRequest,
     DeviceIdnResponse,
     DeltaElektronicaServiceBase,
+    DeviceVoltageRequest,
+    DeviceVoltageResponse,
+    Empty
 )
 
 
 class DeltaElektronicaService(DeltaElektronicaServiceBase):
     def __init__(self) -> None:
-        self.client = SCPIClient("COM10", 9600, 1)
+        self.client = SCPIClient("/dev/ttyACM1", 9600, 1)
 
-    async def GetDeviceIDN(self, message: DeviceIdnRequest) -> DeviceIdnResponse:
-        cmd = f"*IDN?"
+    async def get_device_idn(self, message: DeviceIdnRequest) -> DeviceIdnResponse:
+        cmd = "*IDN?"
         resp = self.client.send(cmd)
         return DeviceIdnResponse(identification=resp)
+
+    async def get_voltage(self, message: Empty) -> DeviceVoltageResponse:
+        cmd = "SOUR:VOLT?"
+        resp = self.client.send(cmd)
+        return DeviceVoltageResponse(voltage=float(resp))
+
+    async def set_voltage(self, message: DeviceVoltageRequest) -> DeviceVoltageResponse:
+        cmd = f"SOUR:VOLT {message.voltage}"
+        resp = self.client.send(cmd)
+        logger.info(resp)
+        return DeviceVoltageResponse(voltage=float(resp))
 
 
 async def main(port_override=None):

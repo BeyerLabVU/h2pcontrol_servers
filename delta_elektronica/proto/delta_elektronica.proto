@@ -19,10 +19,9 @@ message DeviceIDNResponse {
 }
 
 message DeviceVoltageRequest {
-  int32 voltage = 1; // in volts
+  float voltage = 1; // in volts
 }
 
 message DeviceVoltageResponse {
-  int32 voltage = 1; // actual voltage applied/read
-  string status = 2; // optional status string like "OK"
+  float voltage = 1; 
 }

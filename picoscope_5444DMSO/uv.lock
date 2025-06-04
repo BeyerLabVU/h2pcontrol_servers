@@ -376,7 +376,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "picosdk", specifier = ">=1.1" },
     { name = "pkginfo", specifier = ">=1.12.1.2" },
-    { name = "ps5444dmso", path = "../../../../../tmp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" },
+    { name = "ps5444dmso", path = "../../../../H2PLUS~1/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" },
     { name = "si-prefix", specifier = ">=1.3.3" },
 ]
 
@@ -404,7 +404,7 @@ wheels = [
 [[package]]
 name = "ps5444dmso"
 version = "1.0"
-source = { path = "../../../../../tmp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
+source = { path = "../../../../H2PLUS~1/AppData/Local/Temp/h2pcontrol-temp/dist/ps5444dmso-1.0-py3-none-any.whl" }
 dependencies = [
     { name = "betterproto2" },
     { name = "betterproto2-compiler" },
@@ -413,10 +413,11 @@ dependencies = [
     { name = "h2pcontrol" },
     { name = "numpy" },
     { name = "picosdk" },
+    { name = "pkginfo" },
     { name = "si-prefix" },
 ]
 wheels = [
-    { filename = "ps5444dmso-1.0-py3-none-any.whl", hash = "sha256:ca7367579c6e35caab2cb181e278c2c0aa40d8ac51d6d032b32ccebf45907f8a" },
+    { filename = "ps5444dmso-1.0-py3-none-any.whl", hash = "sha256:50e5cc6842f7bd9673c15504a433f032ef031e634423c69508bd9690a171ee59" },
 ]
 
 [package.metadata]
@@ -428,7 +429,7 @@ requires-dist = [
     { name = "h2pcontrol", specifier = ">=1.11" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "picosdk", specifier = ">=1.1" },
-    { name = "ps5444dmso" },
+    { name = "pkginfo", specifier = ">=1.12.1.2" },
     { name = "si-prefix", specifier = ">=1.3.3" },
 ]
 

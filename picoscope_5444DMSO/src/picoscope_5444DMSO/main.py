@@ -9,7 +9,7 @@ from picoscope_utils import PicoscopeUtils
 
 async def main(port_override=None):
     # Replace this list with your actual service implementations
-    server = Server([PicoscopeUtils])
+    server = Server([PicoscopeUtils()])
     
     # We gather the port from the h2pcontrol.server.toml file by default, if we can not get that port we take a default port.
     port = port_override or configuration.get("port", 50052)

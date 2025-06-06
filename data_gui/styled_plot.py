@@ -179,9 +179,7 @@ class StyledPlotWidget(QWidget):
 
         # Move and show crosshairs
         self.vLine.setPos(x_mouse)
-        self.hLine.setPos(y_display)
         self.vLine.setVisible(True)
-        self.hLine.setVisible(True)
 
         # If there is a data trace, do a simple interpolation on the first visible trace
         items = self.plot_item.listDataItems()
@@ -204,8 +202,11 @@ class StyledPlotWidget(QWidget):
         if self.main_window_status_bar:
             if y_interp is not None:
                 self.main_window_status_bar.update_coordinates(x_mouse, y_interp)
+                self.hLine.setPos(y_interp)
             else:
                 self.main_window_status_bar.update_coordinates(x_mouse, y_display)
+                self.hLine.setPos(y_display)
+        self.hLine.setVisible(True)
 
     def _update_axis_labels_and_ticks(self):
         plot_item = self.plot_item

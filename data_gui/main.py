@@ -5,7 +5,7 @@ import qasync
 
 from main_window import MainWindow
 
-import reactivex.scheduler.eventloop # This might not be strictly needed with qasync managing the loop
+# Main data structures for holding the data stream configs
 
 
 if __name__ == "__main__":

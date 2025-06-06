@@ -33,32 +33,56 @@ class SettingsMenu:
 
 
 class MenuBar:
-    """
-    Encapsulates all menu‐bar creation, now including:
-      - File menu (Exit action)
-      - Settings menu (with Appearance → style selector)
-      - View menu (Qt-Material dark toggle)
-    """
     def __init__(self, parent_window, status_bar):
         self.parent = parent_window
         self.status_bar = status_bar
         self._build_menus()
 
     def _build_menus(self):
-        menubar = self.parent.menuBar()
+        self.menubar = self.parent.menuBar()
+        self.menubar.setNativeMenuBar(True)
 
         # ---- File Menu ----
-        file_menu = menubar.addMenu("&File")
+        file_menu = self.menubar.addMenu("&File")
+
+        self.change_save_directory_action = QAction("Refresh Data Directory", self.parent)
+        file_menu.addAction(self.change_save_directory_action)
+
+        self.change_save_directory_action = QAction("Force Change Data Directory", self.parent)
+        file_menu.addAction(self.change_save_directory_action)
+
+        self.temp_duplicate_directory_action = QAction("Add Temp Duplicate Data Directory", self.parent)
+        file_menu.addAction(self.temp_duplicate_directory_action)
+
+        file_menu.addSeparator()
+
+        self.save_config_action = QAction("Save Configuration", self.parent)
+        file_menu.addAction(self.save_config_action)
+
+        self.save_config_action = QAction("Save Nodes", self.parent)
+        file_menu.addAction(self.save_config_action)
+
+        file_menu.addSeparator()
+
+        self.load_config_action = QAction("Load Configuration", self.parent)
+        file_menu.addAction(self.load_config_action)
+
+        self.load_config_action = QAction("Load Nodes", self.parent)
+        file_menu.addAction(self.load_config_action)
+
+        file_menu.addSeparator()
+
+        file_menu.addSeparator()
         exit_action = QAction("Exit", self.parent)
         exit_action.triggered.connect(QApplication.instance().quit)
         file_menu.addAction(exit_action)
 
         # ---- Settings Menu (with Appearance submenu) ----
-        settings_menu = menubar.addMenu("&Settings")
+        settings_menu = self.menubar.addMenu("&Settings")
         self.settings_menu = SettingsMenu(settings_menu)
 
         # ---- View Menu (Qt-Material toggle) ----
-        view_menu = menubar.addMenu("&View")
+        view_menu = self.menubar.addMenu("&View")
         self.qt_material_dark_action = QAction("Enable Qt-Material (Dark)", self.parent)
         self.qt_material_dark_action.setCheckable(True)
 
@@ -81,7 +105,4 @@ class MenuBar:
         view_menu.addAction(self.qt_material_dark_action)
 
     def set_qt_material_checked(self, checked: bool):
-        """
-        In case the parent window wants to programmatically toggle the checkbox.
-        """
         self.qt_material_dark_action.setChecked(checked)

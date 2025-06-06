@@ -9,9 +9,8 @@ from reactivex.scheduler.eventloop import AsyncIOScheduler
 class DataSource():
     '''Base class for data sources.'''
 
-    def __init__(self, name="Dummy Data Source", n_channels=2, loop=None):
+    def __init__(self, name="Dummy Data Source", loop=None):
         self.name = name
-        self.n_channels = n_channels
         self.trace_subject = Subject()
         self._stop_requested = False
         self._is_running = False
@@ -44,24 +43,20 @@ class DataSource():
             tuple: (channel_idx, time_array, signal_array)
         """
         trace_count = 0
-        print(f"Starting continuous trace generation for {self.name} with {self.n_channels} channels...")
+        print(f"Starting continuous trace generation for {self.name}...")
 
         start_time = time.perf_counter()
         sleep_time_adj = 0.0
         while not self._stop_requested:
             t = np.linspace(0, 10e-6, 10000) # Example time base
-            for i in range(self.n_channels):
-                # Adjust signal generation based on channel index or source properties
-                phase_shift = trace_count * np.pi / (30 + i*5 + hash(self.name)%10) # Vary per source
-                noise = np.random.randn(len(t)) * (0.05 + i*0.02)
+            # Adjust signal generation based on channel index or source properties
+            phase_shift = trace_count * np.pi / (30 + hash(self.name)%10) # Vary per source
+            noise = np.random.randn(len(t)) * (0.05)
 
-                if i % 2 == 0: # Example: different signals for even/odd channels
-                    signal =  1.0 * np.exp(-t / (3e-6 + i*1e-7)) * np.sin(2 * np.pi * (1e6 + i*0.1e6) * t + phase_shift) + noise
-                else:
-                    signal = -0.5 * np.exp(-t / (3e-6 + i*1e-7)) * np.sin(2 * np.pi * (2e6 + i*0.1e6) * t + phase_shift) - noise
-                
-                if not self._stop_requested: # Check again before emitting
-                    self.trace_subject.on_next({"name": self.name, "channel_idx": i, "time_array": t, "signal_array": signal})
+            signal =  1.0 * np.exp(-t / (3e-6)) * np.sin(2 * np.pi * (1e6) * t + phase_shift) + noise
+            
+            if not self._stop_requested: # Check again before emitting
+                self.trace_subject.on_next({"name": self.name, "time_array": t, "signal_array": signal})
 
             trace_count += 1
             if self._stop_requested:
@@ -72,7 +67,7 @@ class DataSource():
             elapsed_time = current_time - start_time
             start_time = current_time # Reset start_time for next iteration's measurement
             
-            target_interval = 0.05 # 20 Hz
+            target_interval = 0.025
             sleep_time_error = target_interval - elapsed_time
             sleep_time_adj += 0.1 * sleep_time_error # Proportional adjustment
             sleep_time_adj = max(-target_interval*0.5, min(target_interval*0.5, sleep_time_adj)) # Clamp adjustment
@@ -90,8 +85,7 @@ class DataSource():
 async def main():
     # Example of using multiple data sources
     loop = asyncio.get_event_loop()
-    source1 = DataSource(name="RF Source 1", n_channels=2, loop=loop)
-    source2 = DataSource(name="Sensor Array A", n_channels=4, loop=loop)
+    source1 = DataSource(name="RF Source 1", loop=loop)
 
     def print_trace_info(trace_data):
         print(f"Received trace from {trace_data['name']} for channel {trace_data['channel_idx']} with {len(trace_data['time_array'])} points")
@@ -106,16 +100,7 @@ async def main():
         on_completed=lambda: print("Source1 completed")
     )
 
-    sub2 = source2.trace_subject.pipe(
-        ops.observe_on(source2.scheduler)
-    ).subscribe(
-        on_next=print_trace_info,
-        on_error=lambda e: print(f"Error in source2: {e}"),
-        on_completed=lambda: print("Source2 completed")
-    )
-
     await source1.start()
-    await source2.start()
 
     try:
         # Keep the loop running for a bit
@@ -123,9 +108,7 @@ async def main():
     finally:
         print("Stopping data sources...")
         await source1.stop()
-        await source2.stop()
         sub1.dispose()
-        sub2.dispose()
         print("Data sources stopped and subscriptions disposed.")
         # Allow tasks to complete
         await asyncio.sleep(1)

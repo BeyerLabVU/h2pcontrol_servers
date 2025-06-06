@@ -1,6 +1,5 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QScrollArea, QGroupBox, QStyle, QSizePolicy,
-    QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton, QCheckBox
+    QWidget, QVBoxLayout, QScrollArea, QGroupBox, QSizePolicy,
 )
 from PySide6.QtCore import Qt
 
@@ -26,7 +25,7 @@ class ControlPanel(QScrollArea):
         # Set the content widget as the widget for the scroll area
         self.setWidget(self._content_widget)
 
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding) # type: ignore
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 

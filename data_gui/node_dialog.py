@@ -1,6 +1,6 @@
 import os
 import json
-from typing import List, Dict, Any, TYPE_CHECKING
+from typing import List, Dict, Any
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -17,10 +17,8 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
 )
-from PySide6.QtCore import Qt, Slot, QModelIndex
-
-if TYPE_CHECKING:
-    from operators.data_node import PipelineGraph
+from PySide6.QtCore import Qt, Slot
+from data_node import PipelineGraph
 
 class NodeDialog(QDialog):
     """
@@ -42,7 +40,7 @@ class NodeDialog(QDialog):
             raise ValueError("mode must be 'add' or 'edit'")
         self.pipeline = pipeline
         self.mode = mode
-        self.setWindowModality(Qt.ApplicationModal)
+        self.setWindowModality(Qt.ApplicationModal) # type: ignore
         self.setMinimumWidth(400)
         self.setWindowTitle("Add Node" if mode == "add" else "Edit Node")
 
@@ -112,7 +110,9 @@ class NodeDialog(QDialog):
         # Input Nodes Selection
         self.inputs_label = QLabel("Input Nodes (select from list):")
         self.inputs_list = QListWidget()
-        self.inputs_list.setSelectionMode(QListWidget.MultiSelection)
+        self.inputs_list.setSelectionMode(QListWidget.MultiSelection) # type: ignore
+        self._set_input_node_checkboxes()
+
         # Connect the item changed signal to handle input node selection
         self.inputs_list.itemChanged.connect(self._on_input_node_changed)
         main_layout.addWidget(self.inputs_label)
@@ -158,7 +158,7 @@ class NodeDialog(QDialog):
             for fname in files:
                 self.opfile_combo.addItem(fname)
 
-    def _populate_input_nodes_list(self, current_node_id_to_exclude: str = None):
+    def _populate_input_nodes_list(self, current_node_id_to_exclude: str = ""):
         self.inputs_list.clear()
         
         all_node_ids = list(self.pipeline.nodes.keys())
@@ -170,22 +170,22 @@ class NodeDialog(QDialog):
         
         if not available_input_ids:
             item = QListWidgetItem("(no other nodes available to connect)")
-            item.setFlags(item.flags() & ~Qt.ItemIsSelectable & ~Qt.ItemIsUserCheckable) # Make it unselectable
+            item.setFlags(item.flags() & ~Qt.ItemIsSelectable & ~Qt.ItemIsUserCheckable) # type: ignore # Make it unselectable
             self.inputs_list.addItem(item)
             self.inputs_list.setEnabled(False)
         else:
             self.inputs_list.setEnabled(True)
             for node_id_option in available_input_ids:
                 item = QListWidgetItem(node_id_option)
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(Qt.Unchecked)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable) # type: ignore
+                item.setCheckState(Qt.Unchecked) # type: ignore
                 
                 # Check if connecting this node would create a cycle
                 if current_node_id_to_exclude and self.pipeline.would_create_cycle(node_id_option, current_node_id_to_exclude):
                     # Gray out the item and make it unselectable
-                    item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEnabled) # type: ignore
                     item.setText(f"{node_id_option} (would create cycle)")
-                    item.setForeground(Qt.gray)
+                    item.setForeground(Qt.gray) # type: ignore
                 
                 self.inputs_list.addItem(item)
 
@@ -227,16 +227,17 @@ class NodeDialog(QDialog):
                 
                 for i in range(self.inputs_list.count()):
                     item = self.inputs_list.item(i)
-                    if item and item.flags() & Qt.ItemIsEnabled:  # Only check enabled items
+                    if item and item.flags() & Qt.ItemIsEnabled:  # type: ignore # Only check enabled items
                         # Get the node ID from the item text
                         node_text = item.text()
                         if " (would create cycle)" in node_text:
                             node_text = node_text.replace(" (would create cycle)", "")
                         
                         if node_text.strip() in current_inputs:
-                            item.setCheckState(Qt.Checked)
+                            item.setCheckState(Qt.Checked) # type: ignore
                         else:
-                            item.setCheckState(Qt.Unchecked)
+                            item.setCheckState(Qt.Unchecked) # type: ignore
+        self._set_input_node_checkboxes()
 
     def _load_node_into_fields(self, idx: int):
         try:
@@ -258,9 +259,8 @@ class NodeDialog(QDialog):
 
         # Populate input nodes list, excluding the current node itself
         self._populate_input_nodes_list(current_node_id_to_exclude=node.id)
-
-        # 2) Operator file: 
-        #    We assume node.params has a key "operator_file" pointing to either just filename or full path.
+ 
+        # We assume node.params has a key "operator_file" pointing to either just filename or full path.
         opf = node.params.get("operator_file", "")
         if opf and self.opfile_combo.isEnabled():
             # if the file exactly matches one of the items in the combo, select it
@@ -271,31 +271,29 @@ class NodeDialog(QDialog):
                 # put it in the editable line
                 self.opfile_combo.setEditable(True)
                 self.opfile_combo.clear()
-                self.opfile_combo.addItem(opf)        # 3) Params JSON: render entire node.params (except operator_file) as JSON.
-        #    But since we want everything in one dict, just do json.dumps(node.params)
+                self.opfile_combo.addItem(opf)
         try:
             text = json.dumps(node.params, indent=2)
         except Exception:
             text = "{}"
         self.params_edit.setPlainText(text)
 
-        # 4) Input Nodes: Check the ones that are current inputs to this node
         # Temporarily disconnect signal to avoid triggering during setup
         self.inputs_list.itemChanged.disconnect(self._on_input_node_changed)
         
         current_inputs = getattr(node, 'inputs', []) # Assuming node.inputs is a list of input node IDs
         for i in range(self.inputs_list.count()):
             item = self.inputs_list.item(i)
-            if item and item.flags() & Qt.ItemIsEnabled:  # Only check enabled items
+            if item and item.flags() & Qt.ItemIsEnabled:  # type: ignore # Only check enabled items
                 # Get the node ID from the item text (remove any suffix)
                 node_text = item.text()
                 if " (would create cycle)" in node_text:
                     node_text = node_text.replace(" (would create cycle)", "")
                 
                 if node_text.strip() in current_inputs:
-                    item.setCheckState(Qt.Checked)
+                    item.setCheckState(Qt.Checked) # type: ignore
                 else:
-                    item.setCheckState(Qt.Unchecked)
+                    item.setCheckState(Qt.Unchecked) # type: ignore
         
         # Reconnect signal
         self.inputs_list.itemChanged.connect(self._on_input_node_changed)
@@ -332,7 +330,7 @@ class NodeDialog(QDialog):
         if self.inputs_list.isEnabled(): # Only collect if the list is enabled
             for i in range(self.inputs_list.count()):
                 item = self.inputs_list.item(i)
-                if item.checkState() == Qt.Checked:
+                if item.checkState() == Qt.Checked: # type: ignore
                     selected_inputs.append(item.text())
         
         # Now build result_data
@@ -367,7 +365,7 @@ class NodeDialog(QDialog):
         if not current_node_id:
             return
               # Check if the item is being checked or unchecked
-        is_checked = item.checkState() == Qt.Checked
+        is_checked = item.checkState() == Qt.Checked # type: ignore
         
         try:
             if is_checked:
@@ -380,7 +378,7 @@ class NodeDialog(QDialog):
                             print(f"Added edge: {input_node_id} -> {current_node_id}")
                         else:
                             # This shouldn't happen if we grayed out correctly, but safety check
-                            item.setCheckState(Qt.Unchecked)
+                            item.setCheckState(Qt.Unchecked) # type: ignore
                             QMessageBox.warning(self, "Cycle Detection", 
                                               f"Cannot connect {input_node_id} to {current_node_id}: would create a cycle")
                     elif self.mode == "add":
@@ -398,7 +396,7 @@ class NodeDialog(QDialog):
         except Exception as e:
             print(f"Error updating pipeline connection: {e}")
             # Revert the checkbox state on error
-            item.setCheckState(Qt.Unchecked if is_checked else Qt.Checked)
+            item.setCheckState(Qt.Unchecked if is_checked else Qt.Checked) # type: ignore
 
         # For both add and edit mode, we may want to enable/disable the OK button
         self.ok_btn.setEnabled(self._is_valid())
@@ -424,10 +422,34 @@ class NodeDialog(QDialog):
             # Just validate that checked inputs are properly formatted
             for i in range(self.inputs_list.count()):
                 item = self.inputs_list.item(i)
-                if item.checkState() == Qt.Checked:
+                if item.checkState() == Qt.Checked: # type: ignore
                     node_text = item.text()
                     if " (would create cycle)" in node_text:
                         # This shouldn't happen, but if it does, it's invalid
                         return False
 
         return True
+    
+    def _set_input_node_checkboxes(self):
+        if self.mode != "edit" or not hasattr(self, "node_ids"):
+            return
+
+        idx = self.node_index_spin.value()
+        if idx < 0 or idx >= len(self.node_ids):
+            return
+
+        current_node_id = self.node_ids[idx]
+        node = self.pipeline.nodes.get(current_node_id)
+        if not node:
+            return
+
+        current_inputs = getattr(node, 'inputs', [])
+
+        for i in range(self.inputs_list.count()):
+            item = self.inputs_list.item(i)
+            if item and item.flags() & Qt.ItemIsEnabled: # type: ignore
+                node_text = item.text()
+                if node_text.strip() in current_inputs:
+                    item.setCheckState(Qt.Checked) # type: ignore
+                else:
+                    item.setCheckState(Qt.Unchecked) # type: ignore

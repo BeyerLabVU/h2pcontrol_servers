@@ -8,6 +8,8 @@ from reactivex import operators as ops
 from reactivex.scheduler.eventloop import AsyncIOScheduler
 
 
+node_types = ("discharge", "operator", "catchment")
+
 def serialize_pipeline(pipeline: 'PipelineGraph', filename: str):
     nodes_list = []
     for node in pipeline.nodes.values():
@@ -70,10 +72,13 @@ class Node:
         print(f"Node {self.id} (type: {self.node_type}) processing data from {input_node_id}")
         self.subject.on_next(data)
 
-    def subscribe_to_input(self, input_node: 'Node'):
+    def subscribe_to_input(self, input_node: 'Node') -> bool:
+        if self.node_type == "catchment":
+            print("Node is not intended to receive data")
+            return False
         if input_node.id in self.input_subscriptions:
             print(f"Node {self.id} already subscribed to {input_node.id}")
-            return
+            return False
 
         print(f"Node {self.id} subscribing to {input_node.id}")
         subscription = input_node.subject.pipe(
@@ -85,6 +90,8 @@ class Node:
             scheduler=self.scheduler
         )
         self.input_subscriptions[input_node.id] = subscription
+        print(subscription)
+        return True
 
     def unsubscribe_from_input(self, input_node_id: str):
         if input_node_id in self.input_subscriptions:

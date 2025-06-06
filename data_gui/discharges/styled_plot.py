@@ -3,7 +3,7 @@ import pyqtgraph as pg
 import numpy as np
 from PySide6.QtGui import QFont, QCursor
 from PySide6.QtWidgets import QVBoxLayout, QWidget
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import QPointF
 
 from bottom_status_bar import BottomStatusBar
 
@@ -38,7 +38,7 @@ class StyledPlotWidget(QWidget):
     wrapped in a QWidget with QVBoxLayout. Now with fixed crosshair behavior.
     """
 
-    UPDATE_INTERVAL_SEC = 0.05  # 50 ms throttle for crosshair updates
+    UPDATE_INTERVAL_SEC = 0.02  # 20 ms throttle for crosshair updates
 
     def __init__(self, status_bar: BottomStatusBar, *args, background="#ffffff", grid_alpha=0.3, default_color="#0077bb", **kwargs):
         super().__init__(*args, **kwargs)
@@ -92,6 +92,9 @@ class StyledPlotWidget(QWidget):
         # Screen saver
         self.screen_saver_trace()
 
+        # Cross hair setting
+        self.crosshair_trace_idx = None
+
     def screen_saver_trace(self):
         t = np.linspace(0, 10e-6, 1000)
         y = 0.1 * np.exp(-t / 3e-6) * np.sin(2 * np.pi * 1e6 * t)
@@ -101,30 +104,46 @@ class StyledPlotWidget(QWidget):
             self._screen_saver_item.setData(t, y)
         self._screen_saver_item.setVisible(True)
 
-    def setup_traces(self, num_channels: int):
+    def setup_traces(self, num_channels: int, node_ids=None):
         if hasattr(self, '_screen_saver_item') and self._screen_saver_item:
             self._screen_saver_item.setVisible(False)
 
         for item in self.plot_data_items:
             self.plot_widget.removeItem(item)
         self.plot_data_items = []
+        self._trace_id_map = {}  # node_id -> plot_item
 
         colors = ['#0077bb', '#ff0000', '#00ff00', '#ff00ff', '#00ffff', '#ffff00']
         for i in range(num_channels):
             pen_color = colors[i % len(colors)]
             pen = pg.mkPen(color=pen_color, width=2)
             plot_item = self.plot_widget.plot(pen=pen, name=f"Channel {i+1}")
+            node_id = node_ids[i] if node_ids and i < len(node_ids) else f"plot_trace_{i}"
+            plot_item.node_id = node_id
+            plot_item.setVisible(True)
             self.plot_data_items.append(plot_item)
+            self._trace_id_map[node_id] = plot_item
+
+    def set_trace_visibility(self, node_id, visible: bool):
+        """Show or hide a trace by node_id."""
+        if hasattr(self, '_trace_id_map') and node_id in self._trace_id_map:
+            self._trace_id_map[node_id].setVisible(visible)
+            self.refresh_crosshair()
+        else:
+            print(f"Warning: Tried to set visibility for unknown trace '{node_id}'")
 
     def update_trace_data(self, channel_index: int, x_data, y_data):
         if 0 <= channel_index < len(self.plot_data_items):
             self.plot_data_items[channel_index].setData(x_data, y_data)
             self.refresh_crosshair()  # Refresh crosshair after updating data
+        else:
+            print(f"Error: Channel index {channel_index} out of range. Available channels: {len(self.plot_data_items)}")
 
     def clear_all_traces(self):
         for item in self.plot_data_items:
             self.plot_widget.removeItem(item)
         self.plot_data_items = []
+        self._trace_id_map = {}
         if hasattr(self, '_screen_saver_item') and self._screen_saver_item:
             self._screen_saver_item.setVisible(True)
         else:
@@ -183,9 +202,14 @@ class StyledPlotWidget(QWidget):
 
         # If there is a data trace, do a simple interpolation on the first visible trace
         items = self.plot_item.listDataItems()
+        visible_items = [item for item in items if item.isVisible() and item.getData() is not None and len(item.getData()[0]) > 0]
         y_interp = None
-        if items:
-            item = items[0]
+        if self.crosshair_trace_idx is not None and 0 <= self.crosshair_trace_idx < len(visible_items):
+            idx = self.crosshair_trace_idx
+        else:
+            idx = 0
+        if visible_items:
+            item = visible_items[idx]
             x_data, y_data = item.getData()
             if x_data is not None and len(x_data) > 0:
                 idx = np.searchsorted(x_data, x_mouse)
@@ -200,13 +224,17 @@ class StyledPlotWidget(QWidget):
 
         # Update status bar coordinates (if available)
         if self.main_window_status_bar:
-            if y_interp is not None:
+            if (y_interp is not None) and (x_mouse >= x_data[0] and x_mouse <= x_data[-1]):
                 self.main_window_status_bar.update_coordinates(x_mouse, y_interp)
-                self.hLine.setPos(y_interp)
+                self.hLine.setPos(y_interp * self.y_axis.scale)
             else:
                 self.main_window_status_bar.update_coordinates(x_mouse, y_display)
                 self.hLine.setPos(y_display)
         self.hLine.setVisible(True)
+
+    def get_visible_trace_indices(self):
+        """Return indices of currently visible traces."""
+        return [i for i, item in enumerate(self.plot_data_items) if item.isVisible()]
 
     def _update_axis_labels_and_ticks(self):
         plot_item = self.plot_item

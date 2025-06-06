@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QGroupBox, QFormLayout, QWidget, QLabel, QFrame
+from PySide6.QtWidgets import QGroupBox, QFormLayout, QWidget, QLabel, QFrame, QSizePolicy
 from PySide6.QtCore import Qt
 
 class BaseSettingsPanel(QGroupBox):
@@ -19,6 +19,7 @@ class BaseSettingsPanel(QGroupBox):
         super().__init__(parent, title=self.TITLE)
 
         self.setFixedWidth(self.PANEL_FIXED_WIDTH)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)  # Prevent vertical expansion
 
         # Main layout for this group box
         self._form_layout = QFormLayout()
@@ -41,4 +42,4 @@ class BaseSettingsPanel(QGroupBox):
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         # Add a bit of vertical margin for the separator for better visual separation
         separator.setStyleSheet("QFrame { margin-top: 5px; margin-bottom: 5px; }")
-        self._form_layout.addRow(separator) 
+        self._form_layout.addRow(separator)

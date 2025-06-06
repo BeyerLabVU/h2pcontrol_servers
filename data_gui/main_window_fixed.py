@@ -17,6 +17,7 @@ from PySide6.QtCore import Slot
 from discharges.styled_plot import StyledPlotWidget
 from bottom_status_bar import BottomStatusBar
 from control_panel import ControlPanel
+from settings_panels.run_stop_panel import RunStopPanel
 from settings_panels.plot_manager_panel import PlotManagerPanel
 from top_menu_bar import MenuBar
 
@@ -76,25 +77,42 @@ class MainWindow(QMainWindow):
         
         # ---- Multiple PlotNodes for different traces ----
         self.plot_nodes = {}  # Changed to dict for easier management by node_id
+        self.num_traces = 3  # Default number of traces, can be made configurable
+        
+        # Define colors for different traces
+        trace_colors = ['#0077bb', '#ff0000', '#00ff00', '#ff00ff', '#00ffff', '#ffff00']
+        
+        # Create initial PlotNode instances, one for each trace
+        for i in range(self.num_traces):
+            color = trace_colors[i % len(trace_colors)]
+            node_id = f"plot_trace_{i}"
+            plot_node = PlotNode(
+                node_id, 
+                self.plotwidget, 
+                trace_index=i, 
+                trace_color=color,
+                loop=self.loop
+            )
+            self.plot_nodes[node_id] = plot_node
+            self.pipeline_graph.add_node(plot_node)
 
         # ---- Data Sources ----
         self.data_sources = {}
+        available_stream_names = list(self.data_sources.keys())
         
         # ---- Control panel (scroll area on the right) ----
         self.control_panel = ControlPanel()
+        self.run_stop_panel = RunStopPanel(self.control_panel, available_streams=available_stream_names)
+        self.control_panel.add_panel(self.run_stop_panel)
         
         # Add plot manager panel
-        self.plot_manager_panel = PlotManagerPanel(self.control_panel)
+        self.plot_manager_panel = PlotManagerPanel(self.control_panel, max_traces=10)
         self.control_panel.add_panel(self.plot_manager_panel)
-          # Connect plot manager signals
+        
+        # Connect plot manager signals
         self.plot_manager_panel.create_plot_node_signal.connect(self.create_plot_node)
         self.plot_manager_panel.destroy_plot_node_signal.connect(self.destroy_plot_node)
         self.plot_manager_panel.clear_all_plot_nodes_signal.connect(self.clear_all_plot_nodes)
-        self.plot_manager_panel.edit_plot_node_signal.connect(self.edit_plot_node_dialog)
-        self.plot_manager_panel.rename_plot_node_signal.connect(self.rename_plot_node)
-        self.plot_manager_panel.trace_order_changed_signal.connect(self.update_trace_z_order)
-        self.plot_manager_panel.trace_visibility_changed_signal.connect(self.update_trace_visibility)
-        self.plot_manager_panel.trace_visibility_changed_signal.connect(self.update_trace_visibility)
         
         # Sync the plot manager with initial plot nodes
         self.plot_manager_panel.sync_with_plot_nodes(self.plot_nodes)
@@ -137,11 +155,16 @@ class MainWindow(QMainWindow):
         self.test_catchment_initialized = False
         self.add_test_catchment_action.triggered.connect(self.configure_test_catchment)
 
+        # Connect signals from RunStopPanel
+        self.run_stop_panel.stream_selected_signal.connect(self.on_stream_selected)
+        self.run_stop_panel.start_data_signal.connect(self.start_selected_data_stream)
+        self.run_stop_panel.stop_data_signal.connect(self.stop_current_data_stream)
+
         # Initialize with the first stream selected, if any
-        # if available_stream_names:
-        #     self.on_stream_selected(available_stream_names[0])
-        # else:
-        #     self.plotwidget.clear_all_traces() # Show screensaver if no streams
+        if available_stream_names:
+            self.on_stream_selected(available_stream_names[0])
+        else:
+            self.plotwidget.clear_all_traces() # Show screensaver if no streams
 
     def configure_test_catchment(self) -> None:
         test_source = CatchmentNode(
@@ -154,7 +177,7 @@ class MainWindow(QMainWindow):
             self.loop.create_task(test_source.data_source.start())
             # Optionally update available streams and RunStopPanel
             self.data_sources[test_source.id] = test_source.data_source
-            # self.run_stop_panel.update_available_streams(list(self.data_sources.keys()))
+            self.run_stop_panel.update_available_streams(list(self.data_sources.keys()))
             self.test_catchment_initialized = True
             self.add_test_catchment_action.setEnabled(False)  # Disable after adding
     
@@ -241,11 +264,6 @@ class MainWindow(QMainWindow):
         
         print(f"Successfully created plot node: {node_id}")
 
-        # --- Hide screen saver trace if more than one plot node exists ---
-        if len(self.plot_nodes) > 0:
-            if hasattr(self.plotwidget, '_screen_saver_item') and self.plotwidget._screen_saver_item:
-                self.plotwidget._screen_saver_item.setVisible(False)
-
     @Slot(str)
     def destroy_plot_node(self, node_id: str):
         """Destroy the specified plot node."""
@@ -271,10 +289,6 @@ class MainWindow(QMainWindow):
         self.pipeline_graph.remove_node(node_id)
         
         print(f"Successfully destroyed plot node: {node_id}")
-
-        # --- Show screen saver trace if no plot nodes remain ---
-        if len(self.plot_nodes) == 0:
-            self.plotwidget.screen_saver_trace()
 
     @Slot()
     def clear_all_plot_nodes(self):
@@ -342,7 +356,7 @@ class MainWindow(QMainWindow):
             is_discharge = isinstance(new_node, PlotNode) or getattr(new_node, 'node_type', None) == 'discharge'
             if not is_discharge:
                 self.data_sources[node_id] = getattr(new_node, 'data_source', new_node)
-                # self.run_stop_panel.update_available_streams(list(self.data_sources.keys()))
+                self.run_stop_panel.update_available_streams(list(self.data_sources.keys()))
 
     @Slot()
     def open_edit_node_dialog(self):
@@ -367,60 +381,3 @@ class MainWindow(QMainWindow):
             node.params = params
 
             self.plot_status_bar.showMessage(f"Updated node '{node_id}'.")
-
-    @Slot(str)
-    def edit_plot_node_dialog(self, node_id: str):
-        """Open the edit node dialog and select the node with the given node_id."""
-        dialog = NodeDialog(self.pipeline_graph, mode="edit", parent=self)
-        # Find the index of the node_id in the dialog's node_ids list
-        if hasattr(dialog, "node_ids") and node_id in dialog.node_ids:
-            idx = dialog.node_ids.index(node_id)
-            dialog.node_index_spin.setValue(idx)
-        dialog.exec()
-
-    @Slot(str, str)
-    def rename_plot_node(self, old_node_id: str, new_node_id: str):
-        """Rename a plot node and update the pipeline graph and plot_nodes dict."""
-        # Update plot_nodes dict
-        if old_node_id in self.plot_nodes:
-            self.plot_nodes[new_node_id] = self.plot_nodes.pop(old_node_id)
-            self.plot_nodes[new_node_id].id = new_node_id
-        # Update pipeline_graph.nodes dict
-        if old_node_id in self.pipeline_graph.nodes:
-            self.pipeline_graph.nodes[new_node_id] = self.pipeline_graph.nodes.pop(old_node_id)
-            self.pipeline_graph.nodes[new_node_id].id = new_node_id
-        # If the renamed node is the active stream node, update the reference
-        if self.active_stream_node_id == old_node_id:
-            self.active_stream_node_id = new_node_id
-
-    @Slot(list)
-    def update_trace_z_order(self, node_id_order):
-        """Update the z-order of traces in the plot widget so that higher traces are drawn above."""
-        # node_id_order: list of node_ids, topmost first
-        # Reorder plot items in StyledPlotWidget accordingly
-        # We'll remove and re-add plot items in the desired order
-        plot_items = []
-        for node_id in node_id_order:
-            plot_node = self.plot_nodes.get(node_id)
-            if plot_node and plot_node.plot_item is not None:
-                plot_items.append(plot_node.plot_item)
-        # Remove all plot items
-        for plot_node in self.plot_nodes.values():
-            if plot_node.plot_item is not None:
-                try:
-                    self.plotwidget.plot_widget.removeItem(plot_node.plot_item)
-                except Exception:
-                    pass
-        # Add them back in order, bottom to top
-        for plot_item in plot_items[::-1]:
-            self.plotwidget.plot_widget.addItem(plot_item)
-
-    @Slot(str, bool)
-    def update_trace_visibility(self, node_id: str, visible: bool):
-        """Update the visibility of a trace in the plot widget."""
-        plot_node = self.plot_nodes.get(node_id)
-        if plot_node:
-            plot_node.set_visible(visible)
-            print(f"Updated visibility for trace {node_id}: {visible}")
-        else:
-            print(f"Warning: Could not find plot node {node_id} to update visibility")

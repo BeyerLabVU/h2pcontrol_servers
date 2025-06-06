@@ -74,7 +74,7 @@ class MenuBar:
 
         file_menu.addSeparator()
         exit_action = QAction("Exit", self.parent)
-        exit_action.triggered.connect(QApplication.instance().quit)
+        exit_action.triggered.connect(QApplication.instance().quit) # type: ignore
         file_menu.addAction(exit_action)
 
         # ---- Settings Menu (with Appearance submenu) ----

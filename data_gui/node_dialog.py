@@ -1,6 +1,9 @@
 import os
 import json
-from typing import List, Dict, Any
+import inspect
+import importlib.util
+import ast
+from typing import List, Dict, Any, Optional
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -90,6 +93,7 @@ class NodeDialog(QDialog):
         self.opfile_label = QLabel("Operator file:")
         self.opfile_combo = QComboBox()
         self._populate_operator_files()
+        self.opfile_combo.currentIndexChanged.connect(self._on_operator_file_changed)
 
         # Also allow “Browse…” in case user wants to pick an external file
         self.browse_btn = QPushButton("Browse…")
@@ -110,7 +114,7 @@ class NodeDialog(QDialog):
         # Input Nodes Selection
         self.inputs_label = QLabel("Input Nodes (select from list):")
         self.inputs_list = QListWidget()
-        self.inputs_list.setSelectionMode(QListWidget.MultiSelection) # type: ignore
+        self.inputs_list.setSelectionMode(QListWidget.SingleSelection) # type: ignore
         self._set_input_node_checkboxes()
 
         # Connect the item changed signal to handle input node selection
@@ -149,7 +153,7 @@ class NodeDialog(QDialog):
 
         # Sort alphabetically
         files.sort()
-        # If empty, put a placeholder “(no operators found)”
+        # If empty, put a placeholder "(no operators found)"
         if not files:
             self.opfile_combo.addItem("(no operators/ found)")
             self.opfile_combo.setEnabled(False)
@@ -157,6 +161,10 @@ class NodeDialog(QDialog):
             self.opfile_combo.setEnabled(True)
             for fname in files:
                 self.opfile_combo.addItem(fname)
+                
+        # Auto-detect parameters for the first file if available
+        if files and self.mode == "add":
+            self._auto_detect_parameters(os.path.join(operators_dir, files[0]))
 
     def _populate_input_nodes_list(self, current_node_id_to_exclude: str = ""):
         self.inputs_list.clear()
@@ -189,6 +197,145 @@ class NodeDialog(QDialog):
                 
                 self.inputs_list.addItem(item)
 
+    def _auto_detect_parameters(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """
+        Analyze a Python file to detect parameters and generate a default JSON configuration.
+        """
+        if not os.path.exists(file_path):
+            return None
+            
+        try:
+            # Try to load the module and inspect it
+            module_name = f"temp_module_{hash(file_path)}"
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            if spec is None or spec.loader is None:
+                return None
+                
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            # Look for Node subclasses
+            from data_node import Node
+            node_classes = [
+                obj for name, obj in inspect.getmembers(module, inspect.isclass)
+                if issubclass(obj, Node) and obj is not Node
+            ]
+            
+            if not node_classes:
+                # If no Node subclasses found, try to parse the file for __init__ parameters
+                return self._parse_init_params(file_path)
+                
+            # Use the first Node subclass found
+            node_class = node_classes[0]
+            
+            # Get the __init__ signature
+            init_signature = inspect.signature(node_class.__init__)
+            
+            # Extract parameters (excluding self, node_id, node_type, loop)
+            params = {}
+            for param_name, param in init_signature.parameters.items():
+                if param_name not in ['self', 'node_id', 'node_type', 'loop']:
+                    # Get default value if available
+                    if param.default is not param.empty:
+                        params[param_name] = param.default
+                    else:
+                        # Use specific defaults for known parameters or based on annotation
+                        if param_name == 'window':
+                            params[param_name] = 256
+                        elif param.annotation is not param.empty:
+                            if param.annotation == int:
+                                params[param_name] = 0
+                            elif param.annotation == float:
+                                params[param_name] = 0.0
+                            elif param.annotation == bool:
+                                params[param_name] = False
+                            elif param.annotation == str:
+                                params[param_name] = ""
+                            elif param.annotation == list or param.annotation == List:
+                                params[param_name] = []
+                            elif param.annotation == dict or param.annotation == Dict:
+                                params[param_name] = {}
+                        else:
+                            params[param_name] = None
+            
+            # Update the params text field
+            if params:
+                self.params_edit.setPlainText(json.dumps(params, indent=2))
+                return params
+                
+        except Exception as e:
+            print(f"Error auto-detecting parameters: {e}")
+            
+        return None
+        
+    def _parse_init_params(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """
+        Parse the Python file using AST to extract __init__ parameters.
+        """
+        try:
+            with open(file_path, 'r') as f:
+                tree = ast.parse(f.read())
+                
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    # Look for __init__ method
+                    for item in node.body:
+                        if isinstance(item, ast.FunctionDef) and item.name == '__init__':
+                            params = {}
+                            for arg in item.args.args:
+                                if arg.arg not in ['self', 'node_id', 'node_type', 'loop']:
+                                    if arg.arg == 'window':
+                                        params[arg.arg] = 256
+                                    else:
+                                        params[arg.arg] = None
+                                    
+                            # Look for default assignments in the method body
+                            for stmt in item.body:
+                                if isinstance(stmt, ast.Assign):
+                                    if isinstance(stmt.targets[0], ast.Attribute):
+                                        target = stmt.targets[0]
+                                        if isinstance(target.value, ast.Name) and target.value.id == 'self':
+                                            attr_name = target.attr
+                                            if attr_name.startswith('_'):
+                                                attr_name = attr_name[1:]  # Remove leading underscore
+                                            
+                                            # Try to get the value
+                                            if isinstance(stmt.value, ast.Constant):
+                                                params[attr_name] = stmt.value.value
+                                            elif isinstance(stmt.value, ast.List):
+                                                params[attr_name] = []
+                                            elif isinstance(stmt.value, ast.Dict):
+                                                params[attr_name] = {}
+                                                
+                            # Update the params text field
+                            if params:
+                                self.params_edit.setPlainText(json.dumps(params, indent=2))
+                                return params
+                                
+        except Exception as e:
+            print(f"Error parsing file for parameters: {e}")
+            
+        return None
+    
+    @Slot(int)
+    def _on_operator_file_changed(self, index: int):
+        """Handle operator file selection change."""
+        if index < 0 or not self.opfile_combo.isEnabled():
+            return
+            
+        file_name = self.opfile_combo.currentText()
+        if file_name == "(no operators/ found)":
+            return
+            
+        # Check if it's a relative path or absolute path
+        if os.path.isabs(file_name):
+            file_path = file_name
+        else:
+            file_path = os.path.join(os.getcwd(), "operators", file_name)
+            
+        # Auto-detect parameters
+        self._auto_detect_parameters(file_path)
+
     @Slot()
     def _on_browse(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -198,7 +345,7 @@ class NodeDialog(QDialog):
             "Python files (*.py);;All files (*)"
         )
         if file_path:
-            # If it’s inside ./operators/, show only the filename; otherwise show the full path.
+            # If it's inside ./operators/, show only the filename; otherwise show the full path.
             base = os.path.basename(file_path)
             operators_dir = os.path.join(os.getcwd(), "operators")
             if file_path.startswith(operators_dir):
@@ -210,6 +357,9 @@ class NodeDialog(QDialog):
                 self.opfile_combo.setEditable(True)
                 self.opfile_combo.clear()
                 self.opfile_combo.addItem(file_path)
+                
+            # Auto-detect parameters for the selected file
+            self._auto_detect_parameters(file_path)
 
     @Slot(int)
     def _on_index_changed(self, idx: int):
@@ -364,8 +514,16 @@ class NodeDialog(QDialog):
         current_node_id = self.id_edit.text().strip()
         if not current_node_id:
             return
-              # Check if the item is being checked or unchecked
+        
+        # Check if the item is being checked or unchecked
         is_checked = item.checkState() == Qt.Checked # type: ignore
+        
+        # If this item is being checked, uncheck all other items
+        if is_checked:
+            for i in range(self.inputs_list.count()):
+                other_item = self.inputs_list.item(i)
+                if other_item != item and other_item.checkState() == Qt.Checked: # type: ignore
+                    other_item.setCheckState(Qt.Unchecked) # type: ignore
         
         try:
             if is_checked:

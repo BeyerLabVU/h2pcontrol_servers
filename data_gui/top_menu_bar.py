@@ -59,16 +59,16 @@ class MenuBar:
         self.save_config_action = QAction("Save Configuration", self.parent)
         file_menu.addAction(self.save_config_action)
 
-        self.save_config_action = QAction("Save Nodes", self.parent)
-        file_menu.addAction(self.save_config_action)
+        self.save_nodes_action = QAction("Save Nodes", self.parent)
+        file_menu.addAction(self.save_nodes_action)
 
         file_menu.addSeparator()
 
         self.load_config_action = QAction("Load Configuration", self.parent)
         file_menu.addAction(self.load_config_action)
 
-        self.load_config_action = QAction("Load Nodes", self.parent)
-        file_menu.addAction(self.load_config_action)
+        self.load_nodes_action = QAction("Load Nodes", self.parent)
+        file_menu.addAction(self.load_nodes_action)
 
         file_menu.addSeparator()
 

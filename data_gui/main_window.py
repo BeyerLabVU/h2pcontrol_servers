@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QDialog,
     QMessageBox,
+    QFileDialog,
 )
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Slot
@@ -18,6 +19,7 @@ from discharges.styled_plot import StyledPlotWidget
 from bottom_status_bar import BottomStatusBar
 from control_panel import ControlPanel
 from settings_panels.plot_manager_panel import PlotManagerPanel
+from settings_panels.node_manager_panel import NodeManagerPanel
 from top_menu_bar import MenuBar
 
 from node_dialog import NodeDialog
@@ -86,7 +88,14 @@ class MainWindow(QMainWindow):
         # Add plot manager panel
         self.plot_manager_panel = PlotManagerPanel(self.control_panel)
         self.control_panel.add_panel(self.plot_manager_panel)
-          # Connect plot manager signals
+        
+        # Add node manager panel
+        self.node_manager_panel = NodeManagerPanel(self.pipeline_graph, self.control_panel)
+        self.control_panel.add_panel(self.node_manager_panel)
+        # Connect node manager signals
+        self.node_manager_panel.edit_node_signal.connect(self.edit_node_dialog)
+          
+        # Connect plot manager signals
         self.plot_manager_panel.create_plot_node_signal.connect(self.create_plot_node)
         self.plot_manager_panel.destroy_plot_node_signal.connect(self.destroy_plot_node)
         self.plot_manager_panel.clear_all_plot_nodes_signal.connect(self.clear_all_plot_nodes)
@@ -94,7 +103,7 @@ class MainWindow(QMainWindow):
         self.plot_manager_panel.rename_plot_node_signal.connect(self.rename_plot_node)
         self.plot_manager_panel.trace_order_changed_signal.connect(self.update_trace_z_order)
         self.plot_manager_panel.trace_visibility_changed_signal.connect(self.update_trace_visibility)
-        self.plot_manager_panel.trace_visibility_changed_signal.connect(self.update_trace_visibility)
+        self.plot_manager_panel.trace_color_changed_signal.connect(self.update_trace_color)
         
         # Sync the plot manager with initial plot nodes
         self.plot_manager_panel.sync_with_plot_nodes(self.plot_nodes)
@@ -113,6 +122,10 @@ class MainWindow(QMainWindow):
 
         # ---- Build menus via MenuBar helper ----
         self.menu = MenuBar(self, self.plot_status_bar)
+        
+        # Connect save and load nodes actions
+        self.menu.save_nodes_action.triggered.connect(self.save_node_network)
+        self.menu.load_nodes_action.triggered.connect(self.load_node_network)
         # ---- Data streams menu ----
         graph_menu = self.menu.menubar.addMenu("&Graph")
 
@@ -157,6 +170,9 @@ class MainWindow(QMainWindow):
             # self.run_stop_panel.update_available_streams(list(self.data_sources.keys()))
             self.test_catchment_initialized = True
             self.add_test_catchment_action.setEnabled(False)  # Disable after adding
+            
+            # Update the node manager panel to reflect the new test catchment node
+            self.node_manager_panel.sync_with_pipeline_graph()
     
     @Slot(str)
     def on_stream_selected(self, stream_name: str):
@@ -176,7 +192,7 @@ class MainWindow(QMainWindow):
             # For now, connect all traces to the same stream (single-channel)
             # In the future, this could be enhanced to support multi-channel streams
             for plot_node in self.plot_nodes.values():
-                plot_node.subscribe_to_input(stream_node)
+                self.pipeline_graph.add_edge(stream_node.id, plot_node.id)
             self.active_stream_node_id = stream_node.id
             self.plotwidget.clear_all_traces()
         else:
@@ -275,6 +291,9 @@ class MainWindow(QMainWindow):
         # --- Show screen saver trace if no plot nodes remain ---
         if len(self.plot_nodes) == 0:
             self.plotwidget.screen_saver_trace()
+            
+        # Update the node manager panel to reflect the removed node
+        self.node_manager_panel.sync_with_pipeline_graph()
 
     @Slot()
     def clear_all_plot_nodes(self):
@@ -291,7 +310,117 @@ class MainWindow(QMainWindow):
         self.plotwidget.clear_all_traces()
         
         print("Successfully cleared all plot nodes")
+        
+        # Update the node manager panel to reflect the cleared nodes
+        self.node_manager_panel.sync_with_pipeline_graph()
 
+    def save_node_network(self):
+        """Save the current node network to a JSON file."""
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Node Network",
+            "",
+            "JSON Files (*.json);;All Files (*)"
+        )
+        if filename:
+            if not filename.endswith('.json'):
+                filename += '.json'
+            try:
+                from data_node import serialize_pipeline
+                serialize_pipeline(self.pipeline_graph, filename)
+                self.plot_status_bar.showMessage(f"Node network saved to {filename}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to save node network: {str(e)}")
+                
+    def load_node_network(self):
+        """Load a node network from a JSON file."""
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Node Network",
+            "",
+            "JSON Files (*.json);;All Files (*)"
+        )
+        if filename:
+            try:
+                # Clear existing nodes first
+                self.clear_all_plot_nodes()
+                
+                # Clear any remaining non-plot nodes
+                non_plot_node_ids = [node_id for node_id in self.pipeline_graph.nodes.keys()]
+                for node_id in non_plot_node_ids:
+                    self.pipeline_graph.remove_node(node_id)
+                
+                # Load the new pipeline with the plot widget
+                from data_node import deserialize_pipeline
+                new_pipeline = deserialize_pipeline(filename, loop=self.loop, plotwidget=self.plotwidget)
+                
+                # First pass: Add all nodes to the pipeline
+                for node_id, node in new_pipeline.nodes.items():
+                    self.pipeline_graph.add_node(node)
+                    
+                    # If it's a plot node, add it to plot_nodes dict
+                    if isinstance(node, PlotNode):
+                        self.plot_nodes[node_id] = node
+                        # Create a new plot item if needed
+                        if not hasattr(node, 'plot_item') or node.plot_item is None:
+                            # Check if the create_plot_item method exists
+                            if hasattr(node, 'create_plot_item'):
+                                node.create_plot_item()
+                            else:
+                                # Manually create a plot item
+                                import pyqtgraph as pg
+                                node.pen = pg.mkPen(color=node.trace_color, width=2)
+                                node.plot_item = self.plotwidget.plot_widget.plot(
+                                    [], [], 
+                                    pen=node.pen, name=f"Trace {node.trace_index}",
+                                    antialias=True
+                                )
+                                node.plot_item.setVisible(node.visible)
+                        # Ensure the plot widget updates with any restored data
+                        if hasattr(self.plotwidget, '_data_buffers') and node_id in self.plotwidget._data_buffers:
+                            buffers = self.plotwidget._data_buffers[node_id]
+                            if 'time_array' in buffers and 'signal_array' in buffers:
+                                self.plotwidget.update_trace_data(node_id, buffers['time_array'], buffers['signal_array'])
+                                print(f"Restored data buffers for plot node: {node_id}")
+                    # If it's a catchment node, add it to data_sources and start it
+                    elif isinstance(node, CatchmentNode) or "catchment" in getattr(node, 'node_type', '').lower():
+                        self.data_sources[node_id] = getattr(node, 'data_source', node)
+                        # Start the catchment data source
+                        data_source = getattr(node, 'data_source', None)
+                        if data_source:
+                            self.loop.create_task(data_source.start())
+                            print(f"Started catchment node: {node_id}")
+                    # If it's any other non-discharge node, add it to data_sources
+                    elif not getattr(node, 'node_type', None) == 'discharge':
+                        self.data_sources[node_id] = getattr(node, 'data_source', node)
+                
+                # Second pass: Reconnect all nodes based on their inputs
+                for node_id, node in new_pipeline.nodes.items():
+                    # Reconnect inputs
+                    if hasattr(node, 'inputs') and node.inputs:
+                        for input_id in node.inputs:
+                            if input_id in self.pipeline_graph.nodes:
+                                self.pipeline_graph.add_edge(input_id, node_id)
+                                print(f"Reconnected {node_id} to input {input_id}")
+                
+                # Update the node manager panel
+                self.node_manager_panel.sync_with_pipeline_graph()
+                
+                # Update the plot manager panel
+                self.plot_manager_panel.sync_with_plot_nodes(self.plot_nodes)
+                
+                # If there are any plot nodes, make sure the screen saver is hidden
+                if self.plot_nodes:
+                    if hasattr(self.plotwidget, '_screen_saver_item') and self.plotwidget._screen_saver_item:
+                        self.plotwidget._screen_saver_item.setVisible(False)
+                else:
+                    # Show screen saver if no plot nodes
+                    self.plotwidget.screen_saver_trace()
+                
+                self.plot_status_bar.showMessage(f"Node network loaded from {filename}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load node network: {str(e)}")
+    
     def toggle_qt_material_dark_style(self, checked: bool) -> None:
         """Applies or removes the Qt-Material dark theme."""
         app = QApplication.instance()
@@ -313,8 +442,6 @@ class MainWindow(QMainWindow):
             op_file = data["operator_file"]
             params = data["params"]
 
-            params["operator_file"] = op_file
-
             # --- New: Load Node subclass from file if needed ---
             import os
             if os.path.isabs(op_file) or op_file.endswith(".py"):
@@ -325,7 +452,7 @@ class MainWindow(QMainWindow):
                     return
             else:
                 NodeClass = Node  # fallback
-                print(f"Warning: Node type '{op_file}' was fonud to be invalid, using base Node class.")
+                print(f"Warning: Node type '{op_file}' was found to be invalid, using base Node class.")
 
             # Create the new Node and add it to the graph:
             new_node = NodeClass(node_id, node_type=op_file, params=params, loop=self.loop)
@@ -335,7 +462,10 @@ class MainWindow(QMainWindow):
             # Make the node subscribe to the user-configured inputs
             inputs = list(data['inputs'])
             for input_node in inputs:
-                new_node.subscribe_to_input(self.pipeline_graph.nodes[input_node])
+                if input_node in self.pipeline_graph.nodes:
+                    self.pipeline_graph.add_edge(input_node, new_node.id)
+                else:
+                    print(f"Warning: Input node '{input_node}' not found in pipeline for connection to '{new_node.id}'")
 
             # --- Update data_sources and RunStopPanel to include all non-discharge nodes as streams ---
             # Heuristic: exclude PlotNode and any node with node_type == 'discharge'
@@ -343,6 +473,9 @@ class MainWindow(QMainWindow):
             if not is_discharge:
                 self.data_sources[node_id] = getattr(new_node, 'data_source', new_node)
                 # self.run_stop_panel.update_available_streams(list(self.data_sources.keys()))
+            
+            # Update the node manager panel to reflect the new node
+            self.node_manager_panel.sync_with_pipeline_graph()
 
     @Slot()
     def open_edit_node_dialog(self):
@@ -359,7 +492,6 @@ class MainWindow(QMainWindow):
             node_id = list(self.pipeline_graph.nodes.keys())[idx]
             op_file = data["operator_file"]
             params = data["params"]
-            params["operator_file"] = op_file
 
             # Update the existing node in-place:
             node = self.pipeline_graph.nodes[node_id]
@@ -367,6 +499,9 @@ class MainWindow(QMainWindow):
             node.params = params
 
             self.plot_status_bar.showMessage(f"Updated node '{node_id}'.")
+            
+            # Update the node manager panel to reflect the changes
+            self.node_manager_panel.sync_with_pipeline_graph()
 
     @Slot(str)
     def edit_plot_node_dialog(self, node_id: str):
@@ -377,6 +512,18 @@ class MainWindow(QMainWindow):
             idx = dialog.node_ids.index(node_id)
             dialog.node_index_spin.setValue(idx)
         dialog.exec()
+        
+    @Slot(str)
+    def edit_node_dialog(self, node_id: str):
+        """Open the edit node dialog and select the node with the given node_id."""
+        dialog = NodeDialog(self.pipeline_graph, mode="edit", parent=self)
+        # Find the index of the node_id in the dialog's node_ids list
+        if hasattr(dialog, "node_ids") and node_id in dialog.node_ids:
+            idx = dialog.node_ids.index(node_id)
+            dialog.node_index_spin.setValue(idx)
+        if dialog.exec() == QDialog.Accepted:
+            # Update the node manager panel to reflect any changes
+            self.node_manager_panel.sync_with_pipeline_graph()
 
     @Slot(str, str)
     def rename_plot_node(self, old_node_id: str, new_node_id: str):
@@ -392,6 +539,9 @@ class MainWindow(QMainWindow):
         # If the renamed node is the active stream node, update the reference
         if self.active_stream_node_id == old_node_id:
             self.active_stream_node_id = new_node_id
+            
+        # Update the node manager panel to reflect the renamed node
+        self.node_manager_panel.sync_with_pipeline_graph()
 
     @Slot(list)
     def update_trace_z_order(self, node_id_order):
@@ -424,3 +574,15 @@ class MainWindow(QMainWindow):
             print(f"Updated visibility for trace {node_id}: {visible}")
         else:
             print(f"Warning: Could not find plot node {node_id} to update visibility")
+            
+    @Slot(str, str)
+    def update_trace_color(self, node_id: str, color: str):
+        """Update the color of a trace in the plot widget."""
+        plot_node = self.plot_nodes.get(node_id)
+        if plot_node:
+            plot_node.trace_color = color
+            if hasattr(plot_node, 'plot_item') and plot_node.plot_item is not None:
+                plot_node.plot_item.setPen(color)
+            print(f"Updated color for trace {node_id}: {color}")
+        else:
+            print(f"Warning: Could not find plot node {node_id} to update color")

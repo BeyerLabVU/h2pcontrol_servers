@@ -1,0 +1,60 @@
+{
+  "nodes": [
+    {
+      "id": "test_catchment",
+      "type": "catchment",
+      "params": {},
+      "inputs": [],
+      "outputs": [
+        "plot_trace_0",
+        "expw"
+      ],
+      "class": "CatchmentNode"
+    },
+    {
+      "id": "plot_trace_0",
+      "type": "discharge",
+      "params": {},
+      "inputs": [
+        "test_catchment"
+      ],
+      "outputs": [],
+      "class": "PlotNode",
+      "trace_color": "#0077bb",
+      "trace_index": 0,
+      "visible": true,
+      "time_buffer": [],
+      "signal_buffer": []
+    },
+    {
+      "id": "plot_trace_1",
+      "type": "discharge",
+      "params": {},
+      "inputs": [
+        "expw"
+      ],
+      "outputs": [],
+      "class": "PlotNode",
+      "trace_color": "#332288",
+      "trace_index": 1,
+      "visible": true,
+      "time_buffer": [],
+      "signal_buffer": []
+    },
+    {
+      "id": "expw",
+      "type": "moving_average_expw.py",
+      "params": {
+        "window": 256,
+        "operator_file": "moving_average_expw.py"
+      },
+      "inputs": [
+        "test_catchment"
+      ],
+      "outputs": [
+        "plot_trace_1"
+      ],
+      "class": "Node"
+    }
+  ]
+}

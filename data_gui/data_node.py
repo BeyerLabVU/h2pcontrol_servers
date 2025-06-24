@@ -13,27 +13,107 @@ node_types = ("discharge", "operator", "catchment")
 def serialize_pipeline(pipeline: 'PipelineGraph', filename: str):
     nodes_list = []
     for node in pipeline.nodes.values():
-        nodes_list.append({
+        # Filter out operator_file from params to store only configuration data
+        filtered_params = {k: v for k, v in node.params.items() if k != "operator_file"}
+        node_data = {
             "id": node.id,
             "type": node.node_type,
-            "params": node.params,
+            "params": filtered_params,
             "inputs": list(node.inputs),
             "outputs": list(node.outputs),
-        })
+        }
+        
+        # Add specialized attributes for different node types
+        if node.__class__.__name__ == "PlotNode":
+            node_data["class"] = "PlotNode"
+            node_data["trace_color"] = getattr(node, 'trace_color', "#0077bb")
+            node_data["trace_index"] = getattr(node, 'trace_index', 0)
+            node_data["visible"] = getattr(node, 'visible', True)
+            # Capture data buffers if available
+            if hasattr(node, 'plot_widget') and hasattr(node.plot_widget, '_data_buffers'):
+                buffers = node.plot_widget._data_buffers.get(node.id, {})
+                if 'time_array' in buffers and 'signal_array' in buffers:
+                    # Convert numpy arrays to lists for JSON serialization
+                    node_data["time_buffer"] = buffers['time_array'].tolist() if buffers['time_array'] is not None else []
+                    node_data["signal_buffer"] = buffers['signal_array'].tolist() if buffers['signal_array'] is not None else []
+                else:
+                    node_data["time_buffer"] = []
+                    node_data["signal_buffer"] = []
+            else:
+                node_data["time_buffer"] = []
+                node_data["signal_buffer"] = []
+        elif node.__class__.__name__ == "CatchmentNode":
+            node_data["class"] = "CatchmentNode"
+        else:
+            node_data["class"] = "Node"
+            
+        nodes_list.append(node_data)
     data = {"nodes": nodes_list}
     with open(filename, "w") as f:
         json.dump(data, f, indent=2)
 
-def deserialize_pipeline(filename: str, loop: Optional[asyncio.AbstractEventLoop] = None) -> 'PipelineGraph':
+def create_node_from_data(entry: dict, loop=None, plotwidget=None):
+    """Create the appropriate node type based on the saved data."""
+    node_class = entry.get("class", "Node")
+    node_id = entry["id"]
+    node_type = entry["type"]
+    params = entry["params"]
+    
+    if node_class == "PlotNode" and plotwidget is not None:
+        # Import here to avoid circular imports
+        from discharges.plot_node import PlotNode
+        trace_color = entry.get("trace_color", "#0077bb")
+        trace_index = entry.get("trace_index", 0)
+        node = PlotNode(
+            node_id=node_id,
+            styled_plot_widget=plotwidget,
+            trace_index=trace_index,
+            trace_color=trace_color,
+            params=params,
+            loop=loop
+        )
+        # Set additional attributes
+        node.visible = entry.get("visible", True)
+        # Restore data buffers if available
+        if "time_buffer" in entry and "signal_buffer" in entry:
+            import numpy as np
+            time_buffer = np.array(entry.get("time_buffer", []))
+            signal_buffer = np.array(entry.get("signal_buffer", []))
+            if time_buffer.size > 0 and signal_buffer.size > 0:
+                if not hasattr(plotwidget, '_data_buffers'):
+                    plotwidget._data_buffers = {}
+                plotwidget._data_buffers[node_id] = {
+                    "time_array": time_buffer,
+                    "signal_array": signal_buffer
+                }
+                # Ensure plot item is created and updated with restored data
+                if hasattr(node, 'create_plot_item'):
+                    node.create_plot_item()
+                if hasattr(plotwidget, 'update_trace_data'):
+                    plotwidget.update_trace_data(node_id, time_buffer, signal_buffer)
+        return node
+    elif node_class == "CatchmentNode":
+        # Import here to avoid circular imports
+        from catchments.test_source_node import CatchmentNode
+        from catchments.data_source import DataSource
+        node = CatchmentNode(
+            node_id=node_id,
+            data_source=DataSource(),
+            loop=loop
+        )
+        return node
+    else:
+        # Default to base Node
+        return Node(node_id, node_type, params, loop=loop)
+
+def deserialize_pipeline(filename: str, loop: Optional[asyncio.AbstractEventLoop] = None, plotwidget=None) -> 'PipelineGraph':
     with open(filename, "r") as f:
         data = json.load(f)
 
     graph = PipelineGraph(loop=loop)
     # 1) Recreate nodes
     for entry in data["nodes"]:
-        # TODO: Need a node factory here if we have different node types
-        # For now, assuming all are base Node or type is handled by subclassing
-        node = Node(entry["id"], entry["type"], entry["params"], loop=graph.loop)
+        node = create_node_from_data(entry, loop=graph.loop, plotwidget=plotwidget)
         graph.add_node(node)
     # 2) Recreate edges
     for entry in data["nodes"]:

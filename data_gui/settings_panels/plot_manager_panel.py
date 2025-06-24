@@ -40,6 +40,7 @@ class PlotManagerPanel(BaseSettingsPanel):
     rename_plot_node_signal = Signal(str, str)  # old_node_id, new_node_id
     trace_order_changed_signal = Signal(list)  # List of node_ids in new order
     trace_visibility_changed_signal = Signal(str, bool)  # node_id, visible
+    trace_color_changed_signal = Signal(str, str)  # node_id, new_color
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -301,6 +302,9 @@ class PlotManagerPanel(BaseSettingsPanel):
         visibility_text = "Hide Trace (V)" if current_visible else "Show Trace (V)"
         visibility_action = menu.addAction(visibility_text)
         
+        # Add color change action
+        change_color_action = menu.addAction("Change Color (C)")
+        
         action = menu.exec_(self.plot_nodes_list.mapToGlobal(pos))
         if action == rename_action:
             self.rename_trace(item)
@@ -309,6 +313,8 @@ class PlotManagerPanel(BaseSettingsPanel):
             self.edit_plot_node_signal.emit(node_id)
         elif action == visibility_action:
             self.toggle_trace_visibility(item)
+        elif action == change_color_action:
+            self.change_trace_color(item)
 
     def eventFilter(self, obj, event):
         if obj is self.plot_nodes_list and event.type() == 6:  # 6 == QEvent.KeyPress
@@ -350,6 +356,11 @@ class PlotManagerPanel(BaseSettingsPanel):
                 if current_item:
                     self.toggle_trace_visibility(current_item)
                     return True
+            elif key == Qt.Key.Key_C:
+                current_item = self.plot_nodes_list.currentItem()
+                if current_item:
+                    self.change_trace_color(current_item)
+                    return True
         return super().eventFilter(obj, event)
 
     def emit_trace_order_changed(self):
@@ -382,6 +393,27 @@ class PlotManagerPanel(BaseSettingsPanel):
             # Emit signal to propagate the rename to MainWindow
             self.rename_plot_node_signal.emit(old_id, new_id)
 
+    def change_trace_color(self, item):
+        """Change the color of a trace."""
+        node_id = item.data(NODE_ID_ROLE)
+        current_color = item.data(COLOR_ROLE)
+        
+        # Open color dialog
+        color = QColorDialog.getColor(QColor(current_color), self, "Choose Trace Color")
+        if color.isValid():
+            new_color = color.name()
+            
+            # Update item data
+            item.setData(COLOR_ROLE, new_color)
+            
+            # Update item appearance
+            if item.data(VISIBILITY_ROLE):  # Only update color if trace is visible
+                item.setForeground(color)
+            
+            # Emit signal to update the actual trace color
+            self.trace_color_changed_signal.emit(node_id, new_color)
+            print(f"Changed color for trace {node_id} to {new_color}")
+    
     def toggle_trace_visibility(self, item):
         """Toggle the visibility of a trace."""
         node_id = item.data(NODE_ID_ROLE)

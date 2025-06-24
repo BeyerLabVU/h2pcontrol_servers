@@ -1,12 +1,16 @@
 import asyncio
 import logging
 import numpy as np
-from typing import Any, Optional, Dict, Union
+from typing import Any, Optional, Dict, Union, Tuple
 from PySide6.QtCore import QObject, Signal, QTimer
 import pyqtgraph as pg
 
 from data_node import Node
 from discharges.styled_plot import StyledPlotWidget
+
+# Performance optimization settings
+DOWNSAMPLE_THRESHOLD = 10000  # Number of points above which to apply downsampling
+MAX_POINTS_PER_PIXEL = 2      # Maximum number of points to display per pixel
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -63,22 +67,10 @@ class PlotNode(Node, QObject):
         self.plot_item = None  # Will be created when first data arrives
         
         # Data buffers for plotting
-        self.time_buffer = np.array([])
-        self.signal_buffer = np.array([])
         self.max_points = self.buffer_size
-        
-        # Setup Qt timer for GUI updates (runs on main GUI thread)
-        self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self._update_plot_display)
-        self.update_timer.start(10)  # Start timer with 10ms interval
         
         # Connect signal for thread-safe data handling
         self.data_received.connect(self._handle_data_on_gui_thread)
-        
-        # Track if we have data to display
-        self._has_new_data = False
-        self._temp_time_data = None
-        self._temp_signal_data = None
         
         # Track visibility state
         self.visible = True  # Traces are visible by default
@@ -111,7 +103,7 @@ class PlotNode(Node, QObject):
         Handle incoming data on the GUI thread.
         
         This method is called via Qt signal to ensure thread-safe handling of data.
-        It validates the incoming data format and stores it for the next update cycle.
+        It validates the incoming data format and passes it to the plot widget.
         
         Args:
             data (Dict[str, Any]): The data received from an upstream node.
@@ -123,10 +115,7 @@ class PlotNode(Node, QObject):
                 signal_array = data['signal_array']
                 
                 if isinstance(time_array, np.ndarray) and isinstance(signal_array, np.ndarray):
-                    # Store data for next update cycle
-                    self._temp_time_data = time_array
-                    self._temp_signal_data = signal_array
-                    self._has_new_data = True
+                    self.plot_widget.update_trace_data(self.id, time_array, signal_array)
                     logger.debug(f"Node '{self.id}': Received valid data with shape {signal_array.shape}")
                 else:
                     logger.warning(f"Node '{self.id}': Invalid data types - expected numpy arrays, got time_array: {type(time_array)}, signal_array: {type(signal_array)}")
@@ -136,53 +125,61 @@ class PlotNode(Node, QObject):
         except Exception as e:
             logger.error(f"Node '{self.id}': Error handling data: {str(e)}", exc_info=True)
     
-    def _update_plot_display(self):
+    def _downsample_data(self, x_data: np.ndarray, y_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Update the plot display with new data.
+        Apply intelligent downsampling to the data for improved plotting performance.
         
-        This method is called periodically by a QTimer on the GUI thread.
-        It appends new data to the buffers, trims them to the maximum size,
-        and updates the plot item with the new data.
+        This method uses PyQtGraph's built-in decimation algorithm to reduce the number
+        of points displayed while preserving visual fidelity. It ensures that important
+        features like peaks and valleys are preserved.
         
-        If this is the first data received, it creates a new plot item.
+        Args:
+            x_data (np.ndarray): The x-axis data (time values)
+            y_data (np.ndarray): The y-axis data (signal values)
+            
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Downsampled x and y data arrays
         """
-        # Skip if no new data is available
-        if not self._has_new_data or self._temp_time_data is None or self._temp_signal_data is None:
-            return
+        if len(x_data) <= DOWNSAMPLE_THRESHOLD:
+            # No downsampling needed for small datasets
+            return x_data, y_data
             
         try:
-            # Add new data to buffers
-            self.time_buffer = np.append(self.time_buffer, self._temp_time_data)
-            self.signal_buffer = np.append(self.signal_buffer, self._temp_signal_data)
-            
-            # Trim buffers to max size if needed
-            if len(self.time_buffer) > self.max_points:
-                excess = len(self.time_buffer) - self.max_points
-                self.time_buffer = self.time_buffer[excess:]
-                self.signal_buffer = self.signal_buffer[excess:]
-                logger.debug(f"Node '{self.id}': Trimmed buffers to {self.max_points} points (removed {excess} points)")
+            # Get the visible range of the plot
+            view_box = self.plot_widget.plot_widget.getViewBox()
+            if view_box is None:
+                return x_data, y_data
                 
-            # Create plot item if not exists and add to the plot widget
-            if self.plot_item is None and len(self.time_buffer) > 0:
-                self.plot_item = self.plot_widget.plot_widget.plot(
-                    self.time_buffer, self.signal_buffer, 
-                    pen=self.pen, name=f"Trace {self.trace_index}"
-                )
-                # Set initial visibility based on current state
-                self.plot_item.setVisible(self.visible)
-                logger.debug(f"Node '{self.id}': Created new plot item with {len(self.time_buffer)} points")
-            elif self.plot_item is not None:
-                # Update existing plot item
-                self.plot_item.setData(self.time_buffer, self.signal_buffer)
-                logger.debug(f"Node '{self.id}': Updated plot with {len(self.time_buffer)} points")
+            # Get the visible width in pixels
+            view_range = view_box.viewRange()
+            if not view_range:
+                return x_data, y_data
+                
+            # Calculate the visible width in pixels
+            view_width = view_box.width()
+            if view_width <= 0:
+                return x_data, y_data
+                
+            # Calculate the target number of points based on the view width
+            # We want at most MAX_POINTS_PER_PIXEL points per pixel
+            target_points = int(view_width * MAX_POINTS_PER_PIXEL)
             
-            # Reset flags
-            self._has_new_data = False
-            self._temp_time_data = None
-            self._temp_signal_data = None
+            # Ensure we don't go below a minimum number of points
+            target_points = max(target_points, 1000)
+            
+            if len(x_data) > target_points:
+                # Use PyQtGraph's built-in decimation algorithm
+                # This preserves visual features like peaks and valleys
+                decimated_data = pg.downsample(x_data, y_data, target_points)
+                logger.debug(f"Node '{self.id}': Downsampled from {len(x_data)} to {len(decimated_data[0])} points")
+                return decimated_data
+                
+            return x_data, y_data
             
         except Exception as e:
-            logger.error(f"Node '{self.id}': Error updating plot: {str(e)}", exc_info=True)
+            logger.warning(f"Node '{self.id}': Error during downsampling: {str(e)}")
+            return x_data, y_data
+    
     
     def clear_buffers(self):
         """
@@ -193,8 +190,8 @@ class PlotNode(Node, QObject):
         when the plot needs to be reset.
         """
         logger.info(f"Node '{self.id}': Clearing buffers and removing plot item")
-        self.time_buffer = np.array([])
-        self.signal_buffer = np.array([])
+        if self.id in self.plot_widget._data_buffers:
+            del self.plot_widget._data_buffers[self.id]
         
         # Clear this specific plot item
         if self.plot_item is not None:
@@ -219,6 +216,29 @@ class PlotNode(Node, QObject):
         self.max_points = size
         self.buffer_size = size
     
+    def create_plot_item(self):
+        """
+        Create a plot item for this trace if it doesn't exist.
+        
+        This method is useful when loading a saved node network, as it ensures
+        that the plot item is properly created and added to the plot widget.
+        """
+        if self.plot_item is None:
+            logger.info(f"Node '{self.id}': Creating new plot item")
+            self.pen = pg.mkPen(color=self.trace_color, width=2)
+            self.plot_item = self.plot_widget.plot_widget.plot(
+                [], [], 
+                pen=self.pen, name=f"Trace {self.trace_index}",
+                antialias=True
+            )
+            self.plot_item.setVisible(self.visible)
+            
+            # Enable downsampling in the plot item itself
+            if hasattr(self.plot_item, 'setDownsampling'):
+                self.plot_item.setDownsampling(auto=True, ds=2)  # ds=2 means downsample by factor of 2
+                
+            logger.debug(f"Node '{self.id}': Created new plot item")
+            
     def set_visible(self, visible: bool):
         """
         Set the visibility of this plot trace.

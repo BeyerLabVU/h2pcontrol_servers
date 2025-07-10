@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package lioptec;
+
+// Implement your grpc proto file here.
+// Introduction to gRPC: https://grpc.io/docs/what-is-grpc/introduction/
+
+service LioptecService {
+  rpc Connect(LaserRequest) returns (IsOk);
+  rpc SetWavelength(WavelengthRequest) returns (IsOk);
+  rpc IsReady(Empty) returns (IsOk);
+  rpc Disconnect(Empty) returns (IsOk);
+}
+
+message Empty {}
+
+message LaserRequest {
+    string ip = 1;
+    int32 port = 2;
+}
+
+message WavelengthRequest {
+    float wavelength = 1;
+}
+
+message IsOk{
+    bool ok = 1;
+    string status = 2;
+}

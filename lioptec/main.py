@@ -1,5 +1,5 @@
 def main():
-    print("Hello from h2pcontrol-servers!")
+    print("Hello from lioptec!")
 
 
 if __name__ == "__main__":

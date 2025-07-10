@@ -1,0 +1,13 @@
+[project]
+name = "lioptec"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "grpcio>=1.73.1",
+    "lioptec-server",
+]
+
+[tool.uv.sources]
+lioptec-server = { path = "proto_packages/lioptec-server", editable = true }
